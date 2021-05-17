@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width" />
+    <title>TipJar: Convert ICP to Cycles</title>
+    <base href="/" />
+    <link rel="stylesheet" href="https://cdn.simplecss.org/simple.min.css" />
+    <style>
+      ol {
+        padding-left: 1rem;
+      }
+      input {
+        font-size: 1.075rem;
+        font-family: var(--mono-font);
+        color: var(--code);
+      }
+    </style>
+  </head>
+  <body>
+    <header>
+      <h1>Feeling generous? Spare me some cycles!</h1>
+    </header>
+    <main>
+      <form>
+        <p>
+          <label>Account</label><br />
+          <input
+            type="text"
+            id="account"
+            onclick="this.select(); document.execCommand('copy');"
+            readonly
+          />
+        </p>
+        <p>
+          <label>Balance</label><br />
+          <input type="text" id="balance" readonly />
+        </p>
+        <p>
+          <label>Cycles</label><br />
+          <input type="text" id="cycles" readonly />
+        </p>
+      </form>
+      <div>
+        <p>Instruction:</p>
+        <ol>
+          <li>Send some ICP to the above account.</li>
+          <li>Watch the balance is received.</li>
+          <li>And the balance is then automatically converted into cycles.</li>
+        </ol>
+        <p>Thanks for your donation!</p>
+      </div>
+    </main>
+    <footer><a href="https://github.com/ninegua/tipjar">Source Code</a></footer>
+  </body>
+</html>
