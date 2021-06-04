@@ -70,29 +70,11 @@ const minting_id = Principal.fromText("rkp4c-7iaaa-aaaaa-aaaca-cai");
 const identity = readIdentity();
 const principal = identity.getPrincipal();
 const account = principalToAccountId(principal);
+document.getElementById("account").value = account;
+
 const agent = new HttpAgent({ identity: readIdentity() });
 const ledger = Actor.createActor(ledger_idl, { agent, canisterId: ledger_id });
 const tipjar = Actor.createActor(tipjar_idl, { agent, canisterId: tipjar_id });
-
-/*
-var notifying_once = false;
-async function notify_once(recipient) {
-  if (!notifying_once) {
-    notifying_once = true;
-    const to_subaccount = buildSubAccountId(recipient);
-    const block_height = 129512n;
-    const result = await ledger.notify_dfx({
-      to_canister: minting_id,
-      block_height,
-      from_subaccount: [],
-      to_subaccount: [[...to_subaccount]],
-      max_fee: FEE,
-    });
-    console.log(result);
-    return result;
-  }
-}
-*/
 
 var topping_up = false;
 async function topup(amount, recipient) {
@@ -124,11 +106,7 @@ async function topup(amount, recipient) {
   }
 }
 
-//document.getElementById("principal").value = principal;
-document.getElementById("account").value = account;
-
 var refreshing_ledger = false;
-
 function refresh_ledger() {
   if (!refreshing_ledger) {
     refreshing_ledger = true;
@@ -153,7 +131,6 @@ function refresh_ledger() {
 }
 
 var refreshing_cycles = false;
-
 function refresh_cycles() {
   if (!refreshing_cycles) {
     refreshing_cycles = true;
@@ -173,3 +150,5 @@ function refresh_cycles() {
 /// refresh every 1.5s
 setInterval(refresh_ledger, 1500);
 setInterval(refresh_cycles, 1600);
+
+
