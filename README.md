@@ -1,6 +1,6 @@
 # Tip Jar
 
-[ICP] donation is automatically deposited as [Cycles] to fuel the [Tip Jar Canister].
+[ICP] donation is automatically deposited as [Cycles] to power the [Tip Jar Canister].
 
 [ICP]: https://dfinity.org/faq/icp-utility-token
 [Cycles]: https://dfinity.org/faq/cycles
