@@ -1,15 +1,11 @@
-import { Ed25519KeyIdentity } from "@dfinity/authentication";
-import {
-  Actor,
-  HttpAgent,
-  Principal,
-  blobFromUint8Array,
-  blobToHex,
-} from "@dfinity/agent";
+import { Ed25519KeyIdentity } from "@dfinity/identity";
+import { Actor, HttpAgent } from "@dfinity/agent";
+import { Principal } from "@dfinity/principal";
+
 import {
   idlFactory as tipjar_idl,
   canisterId as tipjar_id,
-} from "dfx-generated/tipjar";
+} from "../../declarations/tipjar";
 import { idlFactory as ledger_idl, canisterId as ledger_id } from "./ledger.js";
 import crc32 from "crc-32";
 import { sha224 } from "js-sha256";
@@ -37,24 +33,22 @@ function readIdentity() {
 function principalToAccountId(principal, subaccount) {
   const shaObj = sha224.create();
   shaObj.update("\x0Aaccount-id");
-  shaObj.update(principal.toBlob());
+  shaObj.update(principal.toUint8Array());
   shaObj.update(subaccount ? subaccount : new Uint8Array(32));
   const hash = new Uint8Array(shaObj.array());
   const crc = crc32.buf(hash);
-  const blob = blobFromUint8Array(
-    new Uint8Array([
-      (crc >> 24) & 0xff,
-      (crc >> 16) & 0xff,
-      (crc >> 8) & 0xff,
-      crc & 0xff,
-      ...hash,
-    ])
-  );
-  return blobToHex(blob);
+  const blob = new Uint8Array([
+    (crc >> 24) & 0xff,
+    (crc >> 16) & 0xff,
+    (crc >> 8) & 0xff,
+    crc & 0xff,
+    ...hash,
+  ]);
+  return Buffer.from(blob).toString("hex");
 }
 
 function buildSubAccountId(principal) {
-  const blob = principal.toBlob();
+  const blob = principal.toUint8Array();
   const subAccount = new Uint8Array(32);
   subAccount[0] = blob.length;
   subAccount.set(blob, 1);
@@ -147,8 +141,6 @@ function refresh_cycles() {
   }
 }
 
-/// refresh every 1.5s
-setInterval(refresh_ledger, 1500);
-setInterval(refresh_cycles, 1600);
-
-
+/// refresh every 5s
+setInterval(refresh_ledger, 5100);
+setInterval(refresh_cycles, 4900);

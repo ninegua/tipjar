@@ -2,6 +2,7 @@
 .vscode/
 .idea/
 **/*~
+**/*.sw[op]
 
 # Mac OSX temporary files
 .DS_Store
@@ -13,3 +14,4 @@
 # frontend code
 node_modules/
 dist/
+declarations/

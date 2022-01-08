@@ -1,25 +1,44 @@
 {
-  "name": "tipjar",
+  "name": "tipjar_assets",
   "version": "0.1.0",
-  "description": "",
-  "keywords": [],
+  "description": "Internet Computer starter application",
+  "keywords": [
+    "Internet Computer",
+    "Motoko",
+    "JavaScript",
+    "Canister"
+  ],
   "scripts": {
-    "build": "webpack"
+    "build": "webpack",
+    "prebuild": "npm run copy:types",
+    "start": "webpack serve --mode development --env development",
+    "prestart": "npm run copy:types",
+    "copy:types": "rsync -avr .dfx/$(echo ${DFX_NETWORK:-'**'})/canisters/** --exclude='assets/' --exclude='idl/' --exclude='*.wasm' --delete src/declarations"
   },
   "devDependencies": {
-    "@dfinity/agent": "0.8.9",
-    "@dfinity/authentication": "^0.7.1",
+    "@dfinity/agent": "0.10.2",
+    "@dfinity/candid": "^0.10.2",
+    "@dfinity/identity": "^0.10.2",
+    "@dfinity/principal": "^0.10.2",
     "assert": "2.0.0",
     "buffer": "6.0.3",
+    "copy-webpack-plugin": "^9.0.1",
     "crc-32": "^1.2.0",
     "events": "3.3.0",
-    "html-webpack-plugin": "5.3.1",
-    "js-sha256": "0.9.0",
+    "html-webpack-plugin": "5.5.0",
+    "js-sha256": "^0.9.0",
     "process": "0.11.10",
     "stream-browserify": "3.0.0",
-    "terser-webpack-plugin": "5.1.1",
-    "util": "0.12.3",
-    "webpack": "5.24.4",
-    "webpack-cli": "4.5.0"
-  }
+    "terser-webpack-plugin": "5.2.5",
+    "util": "0.12.4",
+    "webpack": "5.63.0",
+    "webpack-cli": "4.9.1",
+    "webpack-dev-server": "^4.4.0"
+  },
+  "browserslist": [
+    "last 2 chrome version",
+    "last 2 firefox version",
+    "last 2 safari version",
+    "last 2 edge version"
+  ]
 }

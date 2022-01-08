@@ -9,9 +9,10 @@
         "tipjar"
       ],
       "frontend": {
-        "entrypoint": "src/tipjar_assets/index.html"
+        "entrypoint": "src/tipjar_assets/src/index.html"
       },
       "source": [
+        "src/tipjar_assets/assets",
         "dist/tipjar_assets/"
       ],
       "type": "assets"
@@ -19,10 +20,11 @@
   },
   "defaults": {
     "build": {
+      "args": "",
       "packtool": ""
     }
   },
-  "dfx": "0.7.0",
+  "dfx": "0.8.4",
   "networks": {
     "local": {
       "bind": "127.0.0.1:8000",

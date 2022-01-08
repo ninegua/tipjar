@@ -3,7 +3,7 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width" />
-    <title>TipJar: Convert ICP to Cycles</title>
+    <title>TipJar: Donate Cycles to Canisters</title>
     <base href="/" />
     <link rel="stylesheet" href="https://cdn.simplecss.org/simple.min.css" />
     <style>
@@ -15,40 +15,46 @@
         font-family: var(--mono-font);
         color: var(--code);
       }
+      .todo {
+        color: gray;
+      }
     </style>
   </head>
   <body>
     <header>
-      <h1>Feeling generous? Spare me some cycles!</h1>
+      <h1>Donate Cycles to Canisters</h1>
     </header>
     <main>
       <form>
         <p>
-          <label>Account</label><br />
+          <label>Account ID</label><br />
           <input
             type="text"
             id="account"
             onclick="this.select(); document.execCommand('copy');"
             readonly
           />
-        </p>
-        <p>
-          <label>Balance</label><br />
+          <br />
+          <label>ICP Balance</label><br />
           <input type="text" id="balance" readonly />
-        </p>
-        <p>
-          <label>Cycles</label><br />
+          <br />
+          <label>Cycle Balance</label><br />
           <input type="text" id="cycles" readonly />
         </p>
       </form>
       <div>
-        <p>Instruction:</p>
+        <strong>STEPS:</strong><br />
         <ol>
-          <li>Send some ICP to the above account.</li>
-          <li>Watch the balance is received.</li>
-          <li>And the balance is then automatically converted into cycles.</li>
+          <li>Send some ICP to the above account ID.</li>
+          <li>Watch the ICP balance is received.</li>
+          <li>And the ICP is then automatically converted into cycles.</li>
+          <li class="todo">
+            Name or choose one or more canisters to contribute to. (TODO)
+          </li>
+          <li class="todo">
+            Your cycle balance will be donated daily to them. (TODO)
+          </li>
         </ol>
-        <p>Thanks for your donation!</p>
       </div>
     </main>
     <footer><a href="https://github.com/ninegua/tipjar">Source Code</a></footer>
