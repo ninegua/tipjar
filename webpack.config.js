@@ -42,6 +42,8 @@ const frontendDirectory = "tipjar_assets";
 
 const asset_entry = path.join("src", frontendDirectory, "src", "index.html");
 
+const watchPrefix = path.join(__dirname, "src", frontendDirectory);
+
 module.exports = {
   target: "web",
   mode: isDevelopment ? "development" : "production",
@@ -115,7 +117,7 @@ module.exports = {
       },
     },
     hot: true,
-    watchFiles: [path.resolve(__dirname, "src", frontendDirectory)],
+    watchFiles: [`${watchPrefix}/assets/*`, `${watchPrefix}/src/*.js`, `${watchPrefix}/src/*.html`],
     liveReload: true,
   },
 };
