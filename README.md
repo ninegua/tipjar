@@ -1,14 +1,53 @@
-# Tip Jar
+# Canister Tip Jar
 
-[ICP] donation is automatically deposited as [Cycles] to power the [Tip Jar Canister].
+https://k25co-pqaaa-aaaab-aaakq-cai.ic0.app
 
-[ICP]: https://dfinity.org/faq/icp-utility-token
-[Cycles]: https://dfinity.org/faq/cycles
-[Tip Jar Canister]: https://k25co-pqaaa-aaaab-aaakq-cai.ic0.app
+Donate [cycles] to your favorite [canisters] on the [Internet Computer] and keep them live and healthy!
 
-To learn more about developing apps on the Internet Computer, see the following documentation available online:
 
-- [Quick Start](https://sdk.dfinity.org/docs/quickstart/quickstart-intro.html)
-- [SDK Developer Tools](https://sdk.dfinity.org/docs/developers-guide/sdk-guide.html)
-- [Motoko Programming Language Guide](https://sdk.dfinity.org/docs/language-guide/motoko.html)
-- [Motoko Language Quick Reference](https://sdk.dfinity.org/docs/language-guide/language-manual.html)
+**Features and Roadmap**
+
+- [x] Deposit ICP that are automatically converted into Cycles.
+- [x] Name and choose your favorite canisters to contribute to.
+- [x] Monitor canister cycle level and topup whenever it goes lower than the daily average.
+- [x] Deduct cycle funds to make donation based on contribution percentage of each user.
+- [x] Support Internet Identity login.
+- [ ] Support import of PEM file for those who do not have or use Internet Identity.
+- [ ] Blacklist canisters that attempt to rug pull.
+- [ ] Allow canister controllers to authorize their own donation page.
+- [ ] Support canister bundles and easy search and identification.
+- [ ] Support one time donation in addition to daily automatic ones.
+
+[**Got questions? We have answers!**](FAQ.md)
+
+**Releases**
+
+- Version 0.0.0 (retired)
+
+  A technical demo that shows ICPs can be automatically converted into Cycles.
+
+- Version 0.0.1 (released)
+
+  There could still be bugs to iron out over time, please [report issues on GitHub](https://github.com/ninegua/tipjar/issues). Source
+  Source code is being cleaned up and will be release in a week or two.
+
+- Version 0.1.0
+ 
+  Ready when the source code is released.
+
+- Version 0.2.0
+
+  Complete features for both donors and canister developers.
+
+- Version 0.3.0
+
+  Feature freeze. Only bug fixes will be implemented.
+
+- Version 0.4.0
+
+The day when TipJar becomes immutable by having [the black hole] as its only controller!
+
+[cycles]: https://smartcontracts.org/docs/developers-guide/concepts/tokens-cycles.html
+[the black hole]: https://github.com/ninegua/blackhole
+[canisters]: https://sdk.dfinity.org/docs/developers-guide/concepts/canisters-code.html
+[Internet Computer]: https://internetcomputer.org
