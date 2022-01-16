@@ -20,7 +20,7 @@ As a donor you are free at any time to adjust the distribution and allocation of
 
 Before a canister can receive cycles donation, it must set the [black hole canister]
 `e3mmv-5qaaa-aaaah-aadma-cai` as one of its controllers.
-This will enable third parties like the TipJar to monitor its canister status including remaining cycle balance.
+This will enable third parties like the Tip Jar to monitor its canister status including remaining cycle balance.
 Besides revealing such information to public, doing so has no other side effects or security concerns because the black hole itself is immutable and cannot do any harm.
 
 If there is a canister useful to you, please ask its developer to do this sooner than later.
@@ -35,7 +35,7 @@ dfx canister --network=ic update-settings \
 
 ## How frequently is a canister topped up, with how many cycles?
 
-TipJar monitors all canisters on a fixed interval, e.g. every 12 hours (or sooner, depending on the latest setting).
+Tip Jar monitors all canisters on a fixed interval, e.g. every 12 hours (or sooner, depending on the latest setting).
 As soon as it notices the current balance of a canister is below the average of last 10 days, it will send some cycles to bring it on par with the average.
 The consequence of doing this means the average of last 10 days will always stay the same.
 
@@ -47,29 +47,29 @@ Having sufficient supply means a canister has more room to deal with irregular t
 ## What happens if a canister's controller drains its cycles level?
 
 This will usually be considered as a [Rug Pull], which unfortunately cannot be prevented as long as the canister has a controller other than the [black hole canister].
-TipJar does not vouch for a canister's authenticity or its long term viability, so please Do Your Own Research before deciding to back a project or its canisters.
+Tip Jar does not vouch for a canister's authenticity or its long term viability, so please Do Your Own Research before deciding to back a project or its canisters.
 Because cycles are not donated all at once, donors are free to modify their allocations at any time if they wish.
 
 On a technical level, a sudden decrease of cycle level can still be caught, because there is a max amount of cycles that can be burned by a canister in a fixed amount of time.
-So TipJar will attempt to blacklist them for 10 days if such activities are noticed.
+So Tip Jar will attempt to blacklist them for 10 days if such activities are noticed.
 
-## TipJar only supports deposit of cycles, will it support withdrawal of cycles in the future?
+## Tip Jar only supports deposit of cycles, will it support withdrawal of cycles in the future?
 
 There is no plan to support withdrawal of funds once a deposit has been made.
 So please plan ahead and donate responsibly.
 
-## How trust worthy is TipJar itself? What happens if you run away with all donations?
+## How trust worthy is Tip Jar itself? What happens if you run away with all donations?
 
 Like with any crypto project, there is always a risk.
-The short term plan is to make TipJar itself immutable once its code base becomes mature enough, likely within 6 months time.
+The short term plan is to make Tip Jar itself immutable once its code base becomes mature enough, likely within 6 months time.
 You don't have to use this service before that happens, or only put it a small amount that you feel comfortable with.
 
 ## Are you a DAO? Wen airdrop?
 
-My name is Paul Liu, and at the moment I'm TipJar's only developer.
+My name is Paul Liu, and at the moment I'm Tip Jar's only developer.
 I will accept code contributions and coordinate [its development on GitHub](https://github.com/ninegua/tipjar).
 
-Apart from making TipJar immutable at some point down the road, I do not have plans to make it a DAO.
+Apart from making Tip Jar immutable at some point down the road, I do not have plans to make it a DAO.
 No, there will never be a token sale. If you see one, it must be a scam.
 
 [black hole canister]: https://github.com/ninegua/ic-blackhole

@@ -7,18 +7,21 @@ Donate [cycles] to your favorite [canisters] on the [Internet Computer] and keep
 
 **Features and Roadmap**
 
-- [x] Deposit ICP that are automatically converted into Cycles.
+- [x] Deposit ICPs that are automatically converted into cycles.
 - [x] Name and choose your favorite canisters to contribute to.
-- [x] Monitor canister cycle level and topup whenever it goes lower than the daily average.
+- [x] Monitor canister cycle level and top up whenever it goes lower than the daily average.
 - [x] Deduct cycle funds to make donation based on contribution percentage of each user.
 - [x] Support Internet Identity login.
+- [ ] Support "add to home screen" on mobile browsers.
 - [ ] Support import of PEM file for those who do not have or use Internet Identity.
 - [ ] Blacklist canisters that attempt to rug pull.
 - [ ] Allow canister controllers to authorize their own donation page.
 - [ ] Support canister bundles and easy search and identification.
 - [ ] Support one time donation in addition to daily automatic ones.
 
-[**Got questions? We have answers!**](FAQ.md)
+**Got questions? We have answers!**
+
+Please check out the list of [Frequently Asked Questions](FAQ.md).
 
 **Releases**
 
@@ -26,10 +29,10 @@ Donate [cycles] to your favorite [canisters] on the [Internet Computer] and keep
 
   A technical demo that shows ICPs can be automatically converted into Cycles.
 
-- Version 0.0.1 (released)
+- Version 0.0.1 (live)
 
-  There could still be bugs to iron out over time, please [report issues on GitHub](https://github.com/ninegua/tipjar/issues). Source
-  Source code is being cleaned up and will be release in a week or two.
+  There could still be bugs to iron out over time, please [report issues on GitHub](https://github.com/ninegua/tipjar/issues).
+  Source code is being cleaned up and will be released in a week or two.
 
 - Version 0.1.0
  
@@ -45,9 +48,9 @@ Donate [cycles] to your favorite [canisters] on the [Internet Computer] and keep
 
 - Version 0.4.0
 
-The day when TipJar becomes immutable by having [the black hole] as its only controller!
+  The day when TipJar becomes immutable by having [the black hole] as its only controller!
 
 [cycles]: https://smartcontracts.org/docs/developers-guide/concepts/tokens-cycles.html
 [the black hole]: https://github.com/ninegua/blackhole
 [canisters]: https://sdk.dfinity.org/docs/developers-guide/concepts/canisters-code.html
-[Internet Computer]: https://internetcomputer.org
+[Internet Computer]: https://dashboard.internetcomputer.org
