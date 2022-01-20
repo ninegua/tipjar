@@ -12,11 +12,12 @@ Donate [cycles] to your favorite [canisters] on the [Internet Computer] and keep
 - [x] Monitor canister cycle level and top up whenever it goes lower than the daily average.
 - [x] Deduct cycle funds to make donation based on contribution percentage of each user.
 - [x] Support Internet Identity login.
-- [ ] Support "add to home screen" on mobile browsers.
-- [ ] Support import of PEM file for those who do not have or use Internet Identity.
+- [x] Support "add to home screen" on mobile browsers.
+- [x] Support import of PEM file for those who do not have or use Internet Identity.
 - [ ] Blacklist canisters that attempt to rug pull.
+- [ ] Canister list pagenation and searchbox.
 - [ ] Allow canister controllers to authorize their own donation page.
-- [ ] Support canister bundles and easy search and identification.
+- [ ] Support canister bundles and identification.
 - [ ] Support one time donation in addition to daily automatic ones.
 
 **Got questions? We have answers!**
