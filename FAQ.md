@@ -1,6 +1,6 @@
 # Frequently Asked Questions
 
-## Why should I contribute or care?
+## Why should I care?
 
 *There is no free lunch. Neither are your favorite canisters.*
 
@@ -14,9 +14,10 @@ So to help the developers of valuable canister services and to help your future 
 This service monitors the cycle balance of your recipient canisters on a daily basis, and will top up their cycles to their daily average of the last 10 days.
 So as long as there are enough allocations for a canister, it should run in perpetuity, at least in theory.
 
-As a donor you are free at any time to adjust the distribution and allocation of your funds. Canisters will only receive from donors who have allocated funds to them. The amount deducted from a donor's balance is proportional to their allocation.
+As a donor you are free at any time to adjust the distribution and allocation of your funds.
+Canisters will only receive from donors who have allocated funds to them. The amount deducted from a donor's balance is proportional to their allocation.
 
-## Ok, I'm convinced. But why am I getting error when trying to add a canister?
+## Why am I getting an error when trying to add a canister?
 
 Before a canister can receive cycles donation, it must set the [black hole canister]
 `e3mmv-5qaaa-aaaah-aadma-cai` as one of its controllers.
@@ -33,6 +34,20 @@ dfx canister --network=ic update-settings \
   [CANISTER_ID]
 ```
 
+## What is a temporary account?
+
+A temporary account stores your account information (i.e. a randomly generated key pair) only in a browser's local storage.
+Although it is convenient and requires no setup, you can't use the same account across different devices.
+So if you happens to clear the browser's cache or reinstall your computer, you will not be able get your account back.
+
+Therefore it is strongly advised to log in with [Internet Identity] to prevent losing access.
+Your cycle balance and canister lists in the temporary account will be merged into your authenticated account once you log in.
+
+Alternatively you may also authenticate by importing a PEM file of a ed25519 private key.
+This way you are on your own to back up and keep it secure.
+You can use [dfx] to create such a PEM file on your computer.
+For example, `dfx identity new [name]` will create a PEM file in `~/.config/dfx/identity/[name]/identity.pem`.
+
 ## How frequently is a canister topped up, with how many cycles?
 
 Tip Jar monitors all canisters on a fixed interval, e.g. every 12 hours (or sooner, depending on the latest setting).
@@ -44,7 +59,7 @@ So its cycle balance may increase beyond the 10 day average.
 The long term effect is that the newer and higher balance will eventually bring up the average.
 Having sufficient supply means a canister has more room to deal with irregular traffic patterns.
 
-## What happens if a canister's controller drains its cycles level?
+## What happens if a canister's controller drains it cycle level?
 
 This will usually be considered as a [Rug Pull], which unfortunately cannot be prevented as long as the canister has a controller other than the [black hole canister].
 Tip Jar does not vouch for a canister's authenticity or its long term viability, so please Do Your Own Research before deciding to back a project or its canisters.
@@ -75,3 +90,4 @@ No, there will never be a token sale. If you see one, it must be a scam.
 [black hole canister]: https://github.com/ninegua/ic-blackhole
 [Rug Pull]: https://www.coingecko.com/en/glossary/rug-pulled
 [dfx]: https://github.com/dfinity/sdk/
+[Internet Identity]: https://identity.ic0.app
