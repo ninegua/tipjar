@@ -5,10 +5,10 @@
     <meta name="apple-mobile-web-app-title" content="Tip Jar" />
     <title>TipJar: Donate Cycles to Canisters</title>
     <base href="/" />
-    <link rel="manifest" href="/tipjar.webmanifest">
-    <link rel="apple-touch-startup-image" href="/_/raw/icon.png">
-    <link rel="apple-touch-icon" href="/_/raw/icon.png">
-    <link rel="icon" type="image/png" href="icon.png">
+    <link rel="manifest" href="/tipjar.webmanifest" />
+    <link rel="apple-touch-startup-image" href="/_/raw/icon.png" />
+    <link rel="apple-touch-icon" href="/_/raw/icon.png" />
+    <link rel="icon" type="image/png" href="icon.png" />
     <link rel="stylesheet" href="https://cdn.simplecss.org/simple.min.css" />
     <link
       rel="stylesheet"
@@ -142,7 +142,7 @@
           width: 100%;
         }
       }
-      #add_recipient_form {
+      #add_canister_form {
         margin-top: 8px;
       }
       .error {
@@ -325,7 +325,7 @@
           </p>
         </div>
       </section>
-      <section id="recipient_section" hidden>
+      <section id="canister_section" hidden>
         <strong>My Donor Recipients</strong>
         <table>
           <thead>
@@ -335,10 +335,10 @@
               <th class="right">Donated</th>
             </tr>
           </thead>
-          <tbody id="recipients">
+          <tbody id="canisters">
             <tr>
               <td colspan="3" id="login_area">
-                <div id="add_recipient_form" hidden>
+                <div id="add_canister_form" hidden>
                   <div class="center">
                     <div class="table-inner">
                       <label class="input-label" for="new_canister_id"
@@ -354,17 +354,17 @@
                           id="new_canister_id"
                         /><br />
                       </div>
-                      <p class="error" id="add_recipient_error"></p>
+                      <p class="error" id="add_canister_error"></p>
                       <div class="center">
                         <button
                           class="canister-button"
-                          id="commit_add_recipient"
+                          id="commit_add_canister"
                         >
                           Add
                         </button>
                         <button
                           class="canister-button"
-                          id="cancel_add_recipient"
+                          id="cancel_add_canister"
                         >
                           Cancel
                         </button>
@@ -373,10 +373,10 @@
                   </div>
                 </div>
 
-                <div id="add_recipient_anchor" style="width: 100%">
+                <div id="add_canister_anchor" style="width: 100%">
                   <center>
-                    <p class="error" id="add_recipient_msg"></p>
-                    <a id="add_recipient">Add a canister</a>
+                    <p class="error" id="add_canister_msg"></p>
+                    <a id="add_canister">Add a canister</a>
                     <p></p>
                   </center>
                 </div>

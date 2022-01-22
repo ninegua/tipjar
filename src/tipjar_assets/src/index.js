@@ -228,7 +228,7 @@ async function save_canister(tr, id, allocation) {
       let new_allocation = find_canister_allocation(allocation.canister.id);
       tr.innerHTML = canister_row(new_allocation);
       document.getElementById("anchor_" + id).onclick = () => {
-        show_canister(id);
+        show_canister_by_id(id);
       };
       refresh_stats();
       show_account_balance(result.ok);
@@ -265,13 +265,8 @@ async function save_canister(tr, id, allocation) {
   allocated_spinner.hidden = true;
 }
 
-function show_canister(id) {
-  console.log("(" + id + ")");
-  let allocation = find_canister_allocation(id);
-  console.log(allocation);
-  if (!allocation) return;
-  let tr = document.getElementById(id);
-  if (!tr) return;
+function show_canister(tr, allocation, autofocus = false) {
+  let id = allocation.canister.id;
   tr.innerHTML = [
     `<td colspan='3'><a>${formatAlias(allocation)}</a><br>`,
     "<div class='center'><div class='table-inner'>",
@@ -292,30 +287,65 @@ function show_canister(id) {
   document.getElementById(`cancel_canister_${id}`).onclick = () => {
     tr.innerHTML = canister_row(allocation);
     document.getElementById("anchor_" + id).onclick = () => {
-      show_canister(id);
+      show_canister_by_id(id);
     };
   };
-  let inp = document.getElementById(`allocated_${id}`);
-  inp.select();
-  inp.focus();
+  if (autofocus) {
+    let inp = document.getElementById(`allocated_${id}`);
+    inp.select();
+    inp.focus();
+  }
 }
 
-function show_recipients(allocations) {
-  let tbody = document.getElementById("recipients");
-  while (tbody.children.length > allocations.length + 1) {
+function show_canister_by_id(id) {
+  console.log("(" + id + ")");
+  let allocation = find_canister_allocation(id);
+  console.log(allocation);
+  if (!allocation) return;
+  let tr = document.getElementById(id);
+  if (!tr) return;
+  show_canister(tr, allocation, true);
+}
+
+// remove an element to the end of the array if we found it.
+function move_to_last(allocations, id) {
+  var i;
+  let n = allocations.length;
+  for (i = 0; i < n; i++) {
+    if (allocations[i].canister.id == id) {
+      break;
+    }
+  }
+  if (i < n - 1) {
+    let tmp = allocations[i];
+    allocations[i] = allocations[n - 1];
+    allocations[n - 1] = tmp;
+  }
+}
+
+function show_canisters(allocations) {
+  let allocs = [...allocations]; // clone first to avoid mutating it in place
+  let tbody = document.getElementById("canisters");
+  while (tbody.children.length > allocs.length + 1) {
     tbody.removeChild(tbody.children[0]);
   }
   let rows = tbody.children;
   let lastRow = tbody.children[rows.length - 1];
   for (var i = 0; i < allocations.length; i++) {
-    let allocation = allocations[allocations.length - i - 1];
+    if (i + 1 < rows.length) {
+      let existing_id = tbody.children[i].id;
+      move_to_last(allocs, existing_id);
+    }
+    let allocation = allocs.pop();
     let id = allocation.canister.id.toString();
     let row = canister_row(allocation);
     if (i + 1 < rows.length) {
       if (rows[i].children.length == 1) {
-        continue; // skip already opened row
+        show_canister(rows[i], allocation);
+        continue;
+      } else {
+        rows[i].innerHTML = row;
       }
-      rows[i].innerHTML = row;
     } else {
       let tr = document.createElement("tr");
       tr.id = id;
@@ -323,7 +353,7 @@ function show_recipients(allocations) {
       lastRow.insertAdjacentElement("beforebegin", tr);
     }
     document.getElementById("anchor_" + id).onclick = () => {
-      show_canister(id);
+      show_canister_by_id(id);
     };
   }
 }
@@ -343,7 +373,7 @@ function update_user_info(info) {
     agent.set_user_info(info);
     console.log(info);
     show_account_balance(info);
-    show_recipients(info.allocations);
+    show_canisters(info.allocations);
     refresh_stats();
   }
 }
@@ -352,7 +382,7 @@ function clear_user_info() {
   document.getElementById("icp_balance").value = "";
   document.getElementById("cycle_balance").value = "";
   console.log("clear_user_info");
-  show_recipients([]);
+  show_canisters([]);
 }
 
 var refreshing = false;
@@ -385,11 +415,11 @@ async function ping() {
   }
 }
 
-function hide_add_recipient_form(evt) {
+function hide_add_canister_form(evt) {
   if (evt) evt.preventDefault();
   document.getElementById("logout_button").hidden = !agent.is_authenticated();
-  document.getElementById("add_recipient_form").hidden = true;
-  document.getElementById("add_recipient_anchor").hidden = false;
+  document.getElementById("add_canister_form").hidden = true;
+  document.getElementById("add_canister_anchor").hidden = false;
 }
 
 function explain_canister_status_error(msg) {
@@ -407,9 +437,9 @@ function explain_canister_status_error(msg) {
   }
   return reason;
 }
-async function add_recipient(evt) {
+async function add_canister(evt) {
   var canister_id;
-  let error_p = document.getElementById("add_recipient_error");
+  let error_p = document.getElementById("add_canister_error");
   error_p.innerText = "";
   try {
     canister_id = Principal.fromText(
@@ -426,9 +456,9 @@ async function add_recipient(evt) {
   }
 
   document.getElementById("new_canister_spinner").hidden = false;
-  document.getElementById("commit_add_recipient").blur();
-  document.getElementById("commit_add_recipient").disabled = true;
-  document.getElementById("cancel_add_recipient").disabled = true;
+  document.getElementById("commit_add_canister").blur();
+  document.getElementById("commit_add_canister").disabled = true;
+  document.getElementById("cancel_add_canister").disabled = true;
   try {
     let result = await agent.tipjar_allocate({
       canister: canister_id,
@@ -440,7 +470,7 @@ async function add_recipient(evt) {
       refresh_stats();
       update_user_info(result.ok);
       document.getElementById("new_canister_id").value = "";
-      hide_add_recipient_form();
+      hide_add_canister_form();
     } else {
       let err = result.err;
       if ("AccessDenied" in err) {
@@ -463,14 +493,14 @@ async function add_recipient(evt) {
       "Error reaching tipjar canister. Please try again later.";
   }
   document.getElementById("new_canister_spinner").hidden = true;
-  document.getElementById("commit_add_recipient").disabled = false;
-  document.getElementById("cancel_add_recipient").disabled = false;
+  document.getElementById("commit_add_canister").disabled = false;
+  document.getElementById("cancel_add_canister").disabled = false;
 }
 
 var refresh_interval;
 var ping_interval;
 function update_login_status() {
-  document.getElementById("add_recipient_msg").innerText = "";
+  document.getElementById("add_canister_msg").innerText = "";
   let logout_spinner = document.getElementById("logout_spinner");
   let logout_btn = document.getElementById("logout_button");
   logout_btn.onclick = async () => {
@@ -549,20 +579,20 @@ function readFileContent(file) {
   });
 }
 
-function show_add_recipient_form(evt) {
+function show_add_canister_form(evt) {
   if (evt) evt.preventDefault();
-  document.getElementById("add_recipient_msg").innerText = "";
+  document.getElementById("add_canister_msg").innerText = "";
   if (agent.is_anonymous()) {
-    document.getElementById("add_recipient_msg").innerText =
+    document.getElementById("add_canister_msg").innerText =
       "Please login before adding a canister.";
     return;
   }
   document.getElementById("logout_button").hidden = !agent.is_authenticated();
-  document.getElementById("add_recipient_form").hidden = false;
-  document.getElementById("add_recipient_anchor").hidden = true;
-  document.getElementById("commit_add_recipient").onclick = add_recipient;
-  document.getElementById("cancel_add_recipient").onclick =
-    hide_add_recipient_form;
+  document.getElementById("add_canister_form").hidden = false;
+  document.getElementById("add_canister_anchor").hidden = true;
+  document.getElementById("commit_add_canister").onclick = add_canister;
+  document.getElementById("cancel_add_canister").onclick =
+    hide_add_canister_form;
 }
 
 agent = new Agent(update_login_status);
@@ -612,7 +642,7 @@ function scrollIntoView(selector, offset = 0) {
 
 async function hide_faq() {
   document.getElementById("info_section").hidden = false;
-  document.getElementById("recipient_section").hidden = false;
+  document.getElementById("canister_section").hidden = false;
   document.getElementById("faq_section").hidden = true;
 }
 
@@ -620,10 +650,11 @@ async function show_faq() {
   let response = await fetch("faq.html");
   let html = await response.text();
   document.getElementById("info_section").hidden = true;
-  document.getElementById("recipient_section").hidden = true;
+  document.getElementById("canister_section").hidden = true;
   document.getElementById("faq_section").hidden = false;
   document.getElementById("faq_section").innerHTML =
-    '<nav><a href="#"><i class="fas fa-angle-double-left"></i> Back</a></nav><h4 style="margin-top: 0">Frequently Asked Questions</h4>' + html;
+    '<nav><a href="#"><i class="fas fa-angle-double-left"></i> Back</a></nav><h4 style="margin-top: 0">Frequently Asked Questions</h4>' +
+    html;
 }
 
 var scroll_pos = {};
@@ -676,7 +707,7 @@ window.onload = () => {
   };
   document.getElementById("how-it-works").onclick = show_faq;
   document.getElementById("login_button").onclick = start_ii_login;
-  document.getElementById("add_recipient").onclick = show_add_recipient_form;
+  document.getElementById("add_canister").onclick = show_add_canister_form;
   let import_pem_anchor = document.getElementById("import_pem_anchor");
   let choose_pem_file = document.getElementById("choose_pem_file");
   import_pem_anchor.onclick = () => {
