@@ -11,12 +11,12 @@ This led to some design decisions that may appear unusual to trained eyes, so it
 Instead of maintaining lookup tables for users and canisters, I use direct object references.
 
 ```
-User --*--> Allocation --1--> Canister
+User ---*--> Allocation ---1--> Canister
 
-Canister --*--> Donor --1--> User
+Canister ---*--> Donor ---1--> User
 
---*-->    one to many relation
---1-->    one to one relation
+---*-->    one to many relation
+---1-->    one to one relation
 ```
 
 If I were to design data schema for a database, I'd normalize the above relations into several tables.
@@ -56,7 +56,7 @@ It goes through 4 stages:
 - `Mint` and `MintCalled`: Before and after sending ICP to CMC (Cycle Minting Canister) to start the minting.
 - `Notify` and `NotifyCalled`: Before and after calling notify on ledger to in order to receive the minted cycles.
 
-Note that `MintCalled` and `NotifyCalled` are necessary to help remember an message has already been sent to avoid any potential re-entrance problems.
+Note that `MintCalled` and `NotifyCalled` are necessary to help remember a message has already been sent to avoid any potential re-entrance problems.
 
 I chose to implement the ICP to cycle conversion process with one job queue, and canister topping up with another job queue.
 In retrospect these two probably should be merged into a single job queue, then I don't need to worry about the inter-locking between the two queues.
