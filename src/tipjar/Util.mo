@@ -18,7 +18,8 @@ import Queue "mo:mutable-queue/Queue";
 module Util {
 
   // For each canister, we keep a number of historical cycle balance/usage data.
-  let MAX_HISTORY = 10;
+  // At an interval of 8 hours, 30 means keeping data for the past 10 days.
+  let MAX_HISTORY = 30;
 
   public type Queue<T> = Queue.Queue<T>;
   public type Cycle = Nat;
