@@ -9,8 +9,8 @@ $(OBJ_DIR)/tipjar/tipjar.wasm $(OBJ_DIR)/tipjar/tipjar.did $(DIST_DIR)/index.htm
 upgrade: upgrade_backend upgrade_frontend
 
 upgrade_backend: $(OBJ_DIR)/tipjar/tipjar.wasm $(OBJ_DIR)/tipjar/tipjar.did
-	dfx canister --network=ic stop tipjar \
-	dfx canister --network=ic install --mode=upgrade tipjar \
+	dfx canister --network=ic stop tipjar && \
+	dfx canister --network=ic install --mode=upgrade tipjar && \
 	dfx canister --network=ic start tipjar
 
 upgrade_frontend: $(DIST_DIR)/index.html $(DIST_DIR)/index.js

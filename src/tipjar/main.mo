@@ -22,16 +22,32 @@ import Queue "mo:mutable-queue/Queue";
 import Util "./Util";
 
 shared (installation) actor class TipJar() = self {
+
+  // Some administrative functions are only accessible by who created this canister.
   let OWNER = installation.caller;
+
+  // ICP fees (TODO: this ideally should come from the ledger instead of being hard coded).
   let FEE = 10000 : Nat64;
+
+  // Minimum ICP deposit required before converting to cycles.
   let MIN_DEPOSIT = FEE * 2;
+
+  // The current method of converting ICP to cycles is by sending ICP to the
+  // cycle minting canister with a memo.
   let CYCLE_MINTING_CANISTER = Principal.fromText("rkp4c-7iaaa-aaaaa-aaaca-cai");
   let TOP_UP_CANISTER_MEMO = 0x50555054 : Nat64;
-  // let CHECK_INTERVAL = 24 * 3600 * 1_000_000_000; // 24 hours in nano seconds 
-  let CHECK_INTERVAL = 3600 * 8_000_000_000; // 8 hour
-  let MIN_CYCLE_GAP = 100_000_000_000; // minimum gap required before we send in refill
-  let MIN_RESERVE = 1_000_000_000_000; // this canister needs at least this much
 
+  // Wait for CHECK_INTERVAL before checking a canister's cycle balance again.
+  let CHECK_INTERVAL = 3600 * 8_000_000_000;
+
+  // The minimum gap (from the average) required before we topup a canister.
+  let MIN_CYCLE_GAP = 100_000_000_000;
+
+  // The minimum cycle balance for the TipJar canister to keep working.
+  let MIN_RESERVE = 1_000_000_000_000;
+
+  // Interface of the IC00 management canister. At the moment we only need
+  // 'deposit_cycles' to unconditionally send cycles to another canister.
   type Management = actor { deposit_cycles : ({canister_id: Principal}) -> async (); };
 
   type Balance = Util.Balance;
@@ -42,33 +58,57 @@ shared (installation) actor class TipJar() = self {
   type Queue<T> = Queue.Queue<T>;
   type Result<O, E> = Result.Result<O, E>;
 
+  // General stats that we track.
   type TipJar = { var funded: Cycle; var allocated: Cycle; var donated: Cycle; };
   stable var tipjar : TipJar = { var funded = 0; var allocated = 0; var donated = 0 };
 
+  // Return this canister's cycle balance without counting users' funds.
   func selfBalance() : Cycle {
     let cycles = Cycles.balance();
     if (cycles >= tipjar.funded) (cycles - tipjar.funded) else 0
   };
 
+  // Convert Error to Text.
+  func show_error(err: Error) : Text {
+    debug_show({ error = Error.code(err); message = Error.message(err); })
+  };
+
+  // Helper to create logging function.
+  func logger(name: Text) : Text -> async () {
+    let prefix = "[" # Int.toText(Time.now()) # "/";
+    func(s: Text) : async () {
+      Logger.append([prefix # Int.toText(Time.now() / 1_000_000_000) # "] " # name # ": " # s])
+    }
+  };
+
+  //////////////////////////////////////////////////////////////////////////
+  // User related operations
+  //////////////////////////////////////////////////////////////////////////
+
   stable var canisters_v3: Queue<Canister> = Queue.empty();
   stable var users_v3: Queue<User> = Queue.empty();
 
+  // Use this function to get the user list instead of the stable variable itself.
   func all_users() : Queue<User> {
     return users_v3;
   };
 
+  // Use this function to get the canister list instead of the stable variable itself.
   func all_canisters() : Queue<Canister> {
     return canisters_v3;
   };
 
+  // Convert User to UserInfo.
   func userInfo(user: User) : Util.UserInfo {
     Util.userInfo(Principal.fromActor(self), user)
   };
 
+  // Find a user by id.
   func findUser(id: Principal) : ?User {
     Util.findUser(all_users(), id)
   };
 
+  // Same as 'findUser' but will create a new user if not found.
   func findOrCreateNewUser(id: Principal) : User {
     Util.findOrCreateNewUser(all_users(), id)
   };
@@ -79,6 +119,11 @@ shared (installation) actor class TipJar() = self {
     #DoubleDelegateNotAllowed;
   };
 
+  // Delegate caller's account to the given user id.
+  // The given user id doesn't need to have an existing account, but if it does,
+  // it must be an already delegated account. it means double delegation is not
+  // allowed.
+  // Delegation can only be done once.
   public shared (arg) func delegate(id: Principal) : async Result<(), DelegateError> {
     let log = logger("delegate");
     assert(not Principal.isAnonymous(id));
@@ -86,7 +131,7 @@ shared (installation) actor class TipJar() = self {
       case null { #err(#UserNotFound) };
       case (?user) {
         if (Util.delegateUser(user, id)) {
-          ignore log("Delegated " # debug_show({ from = user.id; to = id; 
+          ignore log("Delegated " # debug_show({ from = user.id; to = id;
                                                  balance = user.balance }));
           if (user.balance.cycle > 0 or Queue.size(user.allocations) > 0) {
             let delegate = Util.findOrCreateNewUser(all_users(), id);
@@ -97,10 +142,10 @@ shared (installation) actor class TipJar() = self {
             };
             Util.transferAccount(user, delegate);
           };
-          #ok(()) 
+          #ok(())
         } else {
           ignore log("AlreadyDelegated " # debug_show({
-            user = userInfo(user); 
+            user = userInfo(user);
             delegate = Option.map(Option.chain(user.delegate, findUser), userInfo); }));
           #err(#AlreadyDelegated)
         }
@@ -108,17 +153,21 @@ shared (installation) actor class TipJar() = self {
     }
   };
 
+  // Return 'UserInfo' of the caller.
+  // Note that it will return a default value even when the caller doesn't have an account.
   public shared query (arg) func aboutme() : async Util.UserInfo {
     userInfo(Option.get(findUser(arg.caller), Util.newUser(arg.caller)))
   };
 
   stable var whitelist : Queue<{id: Principal}> = Queue.empty();
 
+  // Add a user id to the whitelist. Used by admin for beta testing only.
   public shared (arg) func allow(id: Principal) {
     assert(arg.caller == OWNER);
     ignore Queue.pushFront({id = id}, whitelist);
   };
 
+  // Test function that directly calls ledger's notify. Used by admin for debugging only.
   public shared (arg) func testNotify(id: Principal, icp: Token, height: Ledger.BlockIndex) {
     assert(arg.caller == OWNER);
     let user = Option.unwrap(findUser(id));
@@ -126,13 +175,14 @@ shared (installation) actor class TipJar() = self {
     depositing := ?(deposit, #Notify(height));
   };
 
+  // Test function that directly calls delegate. Used by admin for debugging only.
   public shared (arg) func testDelegate(from: Principal, to: Principal) {
     assert(arg.caller == OWNER);
     switch (findUser(from), findOrCreateNewUser(to)) {
       case (?from, to) {
        assert(Util.delegateUser(from, to.id));
        let log = logger("testDelegate");
-       ignore log("Delegated " # debug_show({ from = from.id; to = to.id; 
+       ignore log("Delegated " # debug_show({ from = from.id; to = to.id;
                                               balance = from.balance }));
         Util.transferAccount(from, to);
       };
@@ -142,6 +192,8 @@ shared (installation) actor class TipJar() = self {
     }
   };
 
+  // Return self check statistics. Used by admin for debugging only.
+  // TODO: also check balance discrepencies.
   public shared (arg) func selfCheck() : async Text {
     assert(arg.caller == OWNER);
     // (userid, canisterid)
@@ -160,7 +212,7 @@ shared (installation) actor class TipJar() = self {
              out := out # "  Duplicate allocation " # Principal.toText(alloc.canister.id) # "\n";
           };
           set := TrieSet.put(set, elem, hash(elem), eq);
-       } 
+       }
     };
     for (canister in Queue.toIter(all_canisters())) {
        out := out # "Canister " # Principal.toText(canister.id) # "\n";
@@ -183,7 +235,16 @@ shared (installation) actor class TipJar() = self {
     #AccessDenied;
   };
 
-  public shared (arg) func allocate(alloc: Util.AllocationInput) : async Result<Util.UserInfo, AllocationError> {
+  public type AllocationInput = {
+    canister: Principal;
+    alias: ?Text;
+    allocated: Cycle;
+  };
+
+  // Create an allocation by setting aside some cycles that will be donated to a given canister.
+  // Return updated UserInfo if successful.
+  public shared (arg) func allocate(alloc: AllocationInput)
+      : async Result<Util.UserInfo, AllocationError> {
     if (Option.isNull(Queue.find<{id:Principal}>(whitelist, Util.eqId(arg.caller)))) {
       return #err(#AccessDenied)
     };
@@ -211,7 +272,7 @@ shared (installation) actor class TipJar() = self {
               case (#ok(allocation)) {
                let after = Util.getCanisterAllocation(canister);
                tipjar.allocated := tipjar.allocated + after - before;
-               ignore log("Allocated " # 
+               ignore log("Allocated " #
                  debug_show({ asked = alloc; allocated = Util.allocationInfo(allocation) }));
                #ok(userInfo(user))
               }
@@ -232,7 +293,7 @@ shared (installation) actor class TipJar() = self {
                   #err(#InsufficientBalance(usable))
                 };
                 case (#ok(allocation)) {
-                  ignore log("AfterCanisterStatus " # 
+                  ignore log("AfterCanisterStatus " #
                     debug_show({ allocated = Util.allocationInfo(allocation) }));
                   let after = Util.getCanisterAllocation(canister);
                   tipjar.allocated := tipjar.allocated + after - before;
@@ -244,82 +305,68 @@ shared (installation) actor class TipJar() = self {
               #err(#CanisterStatusError(Error.message(err)))
             }
           };
-        } 
+        }
       }
     }
   };
 
   //////////////////////////////////////////////////////////////////////////
-  
+  // System related operations
+  //////////////////////////////////////////////////////////////////////////
+
+  // We we are in stopping mode, new deposits or topup will not be processed.
+  var stopping = false;
+
   type Deposit = { user: User; icp: Token; };
 
+  // Deposit queue. Require users to ping to be added to this queue.
   stable var deposits : Queue<Deposit> = Queue.empty();
+
   type Stage = {
     #Mint;
     #MintCalled;
     #Notify: Ledger.BlockIndex;
     #NotifyCalled;
   };
+
   type Depositing = (Deposit, Stage);
+
+  // Current deposit in progress.
   var depositing : ?Depositing = null;
-  var stopping = false;
 
-  type Stats = { donors: Nat; canisters: Nat; funded: Nat; allocated: Nat; donated: Nat; info: Text };
-  type DepositingInfo = { id: Principal; icp: Token; stage: Stage };
-
-  func depositingInfo() : ?DepositingInfo { 
-    Option.map(depositing, func(d: Depositing) : DepositingInfo {
-      { id = d.0.user.id; icp = d.0.icp; stage = d.1 }
-    })
-  };
-
-  public shared query (msg) func stats() : async Stats {
-    let info = if (msg.caller == OWNER) {
-            debug_show({
-              owner = OWNER;
-              stopping = stopping; 
-              depositing = depositingInfo();
-              topping_up = Option.map(topping_up, func(c: Canister) : Principal { c.id });
-              pending_deposit = Queue.size(deposits); 
-              pending_topup = Queue.size(topup_queue);
-              balance = selfBalance();
-              canisters = Array.map(Queue.toArray(all_canisters()), func (x:Canister):Principal {x.id});})
-          } else "";
-    { donors = Queue.size(all_users());
-      canisters = Queue.size(all_canisters());
-      funded = tipjar.funded;
-      allocated = tipjar.allocated;
-      donated = tipjar.donated;
-      info = info;
-    }
-  };
-
+  // Stop future system activities after finishing pending ones.
   public shared (arg) func stop(val: Bool) {
     assert(arg.caller == OWNER);
     stopping := val;
   };
 
-  // A user ping to update their account balance.
+  // A user has to 'ping' to see updated account balance.
   // If some ICP is received, it will be inserted into the deposit queue.
   public shared (arg) func ping(for_user: ?Principal) {
+    // Do nothing when we are stopping.
     if (stopping) return;
     let log = logger("ping");
+
+    // Allow admin to ping on behalf of a user.
     let id = switch (for_user, arg.caller == OWNER) {
       case (?id, true) id;
       case _ (arg.caller);
     };
+
+    // Disallow anonymous user.
     assert(not Principal.isAnonymous(id));
+
     let subaccount = Util.principalToSubAccount(id);
     let account = Blob.fromArray(AccountId.fromPrincipal(Principal.fromActor(self), ?subaccount));
     try {
       let icp = await Ledger.account_balance({ account = account });
-      if (icp.e8s >= MIN_DEPOSIT and 
-          Option.isNull(Queue.find<Deposit>(deposits, func(x) { x.user.id == id })) and 
+      if (icp.e8s >= MIN_DEPOSIT and
+          Option.isNull(Queue.find<Deposit>(deposits, func(x) { x.user.id == id })) and
           not (Option.getMapped(depositingInfo(), Util.eqId(id), false))) {
         let user = findOrCreateNewUser(id);
         ignore log("AccountBalance " # debug_show({
-          user = id; 
-          icp = { old = user.balance.icp; new = icp }; 
+          user = id;
+          icp = { old = user.balance.icp; new = icp };
           delegate = Option.isSome(user.delegate);
           }));
         ignore Util.setUserICP(user, icp);
@@ -332,7 +379,7 @@ shared (installation) actor class TipJar() = self {
         case (?user) {
           if (Util.setUserICP(user, icp)) {
             ignore log("AccountBalance " # debug_show({
-              user = id; 
+              user = id;
               icp = { old = user.balance.icp; new = icp };
               delegate = Option.isSome(user.delegate);
             }));
@@ -346,15 +393,18 @@ shared (installation) actor class TipJar() = self {
 
   // Poll the deposit queue to convert from ICP to Cycle.
   // Inflight deposit should block canister topup, and vice versa.
+  // Note that this is called from heartbeat, but can also be called manually by admin.
   public shared (arg) func poll() {
-    if (stopping or not (arg.caller == Principal.fromActor(self) or arg.caller == OWNER)) return;
-    if (Option.isNull(depositing)) {
+    // Only admin or self can call poll.
+    if (not (arg.caller == Principal.fromActor(self) or arg.caller == OWNER)) return;
+
+    // Only start working on the next deposit if we are not stopping.
+    if (Option.isNull(depositing) and not stopping) {
       switch (Queue.popFront(deposits)) {
-        case null {
-          return;
-        };
-        case (?deposit) { 
-          assert(Option.isNull(topping_up)); // TRAP if there is topping up inflight
+        case null return;
+        case (?deposit) {
+          // We must TRAP if there is a topup in progress to avoid changing deposit queue.
+          assert(Option.isNull(topping_up));
           depositing := ?(deposit, #Mint)
         };
       }
@@ -399,7 +449,7 @@ shared (installation) actor class TipJar() = self {
         let from_subaccount = Util.principalToSubAccount(user.id);
         let to_subaccount = Util.principalToSubAccount(Principal.fromActor(self));
         let starting_cycles = Cycles.balance();
-        ignore log("BeforeNotify " # 
+        ignore log("BeforeNotify " #
           debug_show({ user = user.id; deposit = deposit.icp; starting_cycles = starting_cycles; }));
         try {
           depositing := ?(deposit, #NotifyCalled);
@@ -415,11 +465,11 @@ shared (installation) actor class TipJar() = self {
           if (ending_cycles < starting_cycles) {
             // TODO: notify user
           } else {
-            tipjar.funded := tipjar.funded + ending_cycles - starting_cycles; 
+            tipjar.funded := tipjar.funded + ending_cycles - starting_cycles;
             let beneficiary = Option.get(Option.chain(user.delegate, findUser), user);
             let old_cycle = beneficiary.balance.cycle;
-            ignore Util.setUserCycle(beneficiary, 
-              beneficiary.balance.cycle + ending_cycles - starting_cycles); 
+            ignore Util.setUserCycle(beneficiary,
+              beneficiary.balance.cycle + ending_cycles - starting_cycles);
             ignore log("TopUpCycle " # debug_show({
               user = beneficiary.id; delegate = beneficiary.id != user.id;
               old = old_cycle; new = beneficiary.balance.cycle; }));
@@ -435,66 +485,83 @@ shared (installation) actor class TipJar() = self {
     }
   };
 
+  // When we are ready to topup a canister, we add it to the topup_queue.
   var topup_queue : Queue<Canister> = Queue.empty<Canister>();
+
+  // The canister that we are currently trying to topup.
   var topping_up : ?Canister = null;
+
+  // Poll the topup queue to top up the next canister.
+  // Inflight topup should block user deposit, and vice versa.
+  // Note that this is called from heartbeat, but can also be called manually by admin.
   public shared (arg) func topup() {
-    if (stopping or Option.isSome(topping_up) or 
+    // Do nothing if we are already doing a topup, or caller is not self or admin.
+    if (Option.isSome(topping_up) or
         not (arg.caller == Principal.fromActor(self) or arg.caller == OWNER)) return;
+
     switch (Queue.popFront(topup_queue)) {
       case null { return };
       case (?canister) {
         let log = logger("topup");
-        let average = Util.roundUp(Util.getCanisterDailyAverage(canister));
+        let average = Util.roundUp(Util.getCanisterAverageCycle(canister));
         let cycle = Util.getCanisterCycle(canister);
         if (cycle + MIN_CYCLE_GAP <= average) {
           let gap = Nat.sub(average, cycle);
           // can't allow tipjar to go below MIN_RESERVE.
-          if (gap + MIN_RESERVE > Cycles.balance()) return; 
-          switch (Util.deductCanisterDonation(canister, gap)) {
-            case null return;
-            case (?donation) {
-              if (donation > gap) { return };                // Can't fail
-              if (tipjar.funded < donation) {                // Can't fail
-                ignore log("ConsistencyError " # debug_show({ funded = tipjar.funded; donation = donation }));
-                return
-              };
-              if (tipjar.allocated < donation) {             // Can't fail
-                ignore log("ConsistencyError " # debug_show({ allocated = tipjar.allocated; donation = donation }));
-                return
-              };
-              Util.addDonation(canister, donation);
-              tipjar.funded := tipjar.funded - donation;
-              tipjar.donated := tipjar.donated + donation;
-              tipjar.allocated := tipjar.allocated - donation;
-              // only need to make deposit call when not topping up self
-              if (canister.id != Principal.fromActor(self)) {
-                assert(Option.isNull(depositing)); // TRAP when depositing is in progress
-                topping_up := ?canister;
-                ignore log("BeforeDeposit " # debug_show({ canister = canister.id; cycle = donation }));
-                let management : Management = actor("aaaaa-aa");
-                try {
-                  Cycles.add(donation);
-                  await management.deposit_cycles({canister_id = canister.id});
-                  ignore log("AfterDeposit")
-                } catch (err) {
-                  ignore log("AfterDeposit " # show_error(err))
-                };
-                topping_up := null;
-              } else {
-                ignore log("SelfDeposit " # debug_show({ canister = canister.id; cycle = donation }));
-              }
-            }
+          if (gap + MIN_RESERVE > Cycles.balance()) return;
+          let donation = Util.deductCanisterDonation(canister, gap);
+          if (donation == 0) { return };
+          if (donation > gap) { return };                // Can't fail
+          if (tipjar.funded < donation) {                // Can't fail
+            ignore log("ConsistencyError " #
+              debug_show({ funded = tipjar.funded; donation = donation }));
+            return
+          };
+          if (tipjar.allocated < donation) {             // Can't fail
+            ignore log("ConsistencyError " #
+              debug_show({ allocated = tipjar.allocated; donation = donation }));
+            return
+          };
+          Util.addDonation(canister, donation);
+          tipjar.funded := tipjar.funded - donation;
+          tipjar.donated := tipjar.donated + donation;
+          tipjar.allocated := tipjar.allocated - donation;
+          // only need to make deposit call when not topping up self
+          if (canister.id != Principal.fromActor(self)) {
+            assert(Option.isNull(depositing)); // TRAP when depositing is in progress
+            topping_up := ?canister;
+            ignore log("BeforeDeposit " #
+              debug_show({ canister = canister.id; cycle = donation }));
+            let management : Management = actor("aaaaa-aa");
+            try {
+              Cycles.add(donation);
+              await management.deposit_cycles({canister_id = canister.id});
+              ignore log("AfterDeposit")
+            } catch (err) {
+              ignore log("AfterDeposit " # show_error(err))
+            };
+            topping_up := null;
+          } else {
+            ignore log("SelfDeposit "
+              # debug_show({ canister = canister.id; cycle = donation }));
           }
         }
       }
-    };
-    // We only reach here after a successful topup
-    topup()
+    }
   };
 
   system func heartbeat() : async () {
-    if (stopping) return;
+    // Always try to poll to finish the current depositing process.
     poll();
+
+    // Always try to topup to the finish queued topup jobs.
+    topup();
+
+    // Do nothing if we are stopping.
+    if (stopping) return;
+
+    // Check next canister to see if it needs to be topped up. Note that
+    // all canisters are always arranged in the order of last_checked.
     switch (Queue.first(all_canisters())) {
       case null ();
       case (?canister) {
@@ -517,26 +584,51 @@ shared (installation) actor class TipJar() = self {
               return;
             }
           };
-          Util.setCanisterCycle(canister, cycle);
+          Util.addCanisterCycleCheck(canister, cycle);
           ignore log("AfterCheck " # debug_show({ cycle = cycle }));
-          if (cycle + MIN_CYCLE_GAP <= Util.roundUp(Util.getCanisterDailyAverage(canister))) {
+          if (cycle + MIN_CYCLE_GAP <= Util.roundUp(Util.getCanisterAverageCycle(canister))) {
             ignore log("EnqueueTopUp " # debug_show({ canister = canister.id }));
             ignore Queue.pushBack(topup_queue, canister);
-            topup();
           }
         }
       }
     }
   };
 
-  func show_error(err: Error) : Text {
-    debug_show({ error = Error.code(err); message = Error.message(err); })
+  //////////////////////////////////////////////////////////////////////////
+  // Stats
+  //////////////////////////////////////////////////////////////////////////
+
+  type Stats = { donors: Nat; canisters: Nat; funded: Nat; allocated: Nat; donated: Nat; info: Text };
+  type DepositingInfo = { id: Principal; icp: Token; stage: Stage };
+
+  func depositingInfo() : ?DepositingInfo {
+    Option.map(depositing, func(d: Depositing) : DepositingInfo {
+      { id = d.0.user.id; icp = d.0.icp; stage = d.1 }
+    })
   };
 
-  func logger(name: Text) : Text -> async () {
-    let prefix = "[" # Int.toText(Time.now()) # "/"; 
-    func(s: Text) : async () {
-      Logger.append([prefix # Int.toText(Time.now() / 1_000_000_000) # "] " # name # ": " # s])
+  // Return system stats, with extra info if the caller is admin.
+  public shared query (msg) func stats() : async Stats {
+    let info = if (msg.caller == OWNER) {
+            debug_show({
+              owner = OWNER;
+              stopping = stopping;
+              depositing = depositingInfo();
+              topping_up = Option.map(topping_up, func(c: Canister) : Principal { c.id });
+              pending_deposit = Queue.size(deposits);
+              pending_topup = Queue.size(topup_queue);
+              balance = selfBalance();
+              canisters = Array.map(Queue.toArray(all_canisters()),
+                            func (x:Canister):Principal {x.id});
+            })} else "";
+    { donors = Queue.size(all_users());
+      canisters = Queue.size(all_canisters());
+      funded = tipjar.funded;
+      allocated = tipjar.allocated;
+      donated = tipjar.donated;
+      info = info;
     }
   };
+
 }

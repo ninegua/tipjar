@@ -17,7 +17,8 @@ import Queue "mo:mutable-queue/Queue";
 
 module Util {
 
-  let MAX_CYCLE_HISTORY = 10;
+  // For each canister, we keep a number of historical cycle balance/usage data.
+  let MAX_HISTORY = 10;
 
   public type Queue<T> = Queue.Queue<T>;
   public type Cycle = Nat;
@@ -35,12 +36,6 @@ module Util {
     var donated: Cycle;
   };
 
-  public type AllocationInput = {
-    canister: Principal;
-    alias: ?Text;
-    allocated: Cycle;
-  };
-
   public type AllocationInfo = {
     canister: CanisterInfo;
     alias: Text;
@@ -56,7 +51,9 @@ module Util {
 
   public type User = {
     id: Principal;
-    var delegate: ?Principal; // all balance should go to the delegate
+    // A user can delegate all its cycle balance to another user.
+    // This is used to merge a temporary account into an authenticated account.
+    var delegate: ?Principal;
     balance: Balance;
     allocations: Queue<Allocation>;
     var last_updated: Time.Time;
@@ -105,6 +102,7 @@ module Util {
     error: ?Text;
   };
 
+  // Same as Option.unwrap, but without the annoying warning.
   func unwrap<T>(x: ?T) : T {
     switch x {
       case null { Prelude.unreachable() };
@@ -112,16 +110,18 @@ module Util {
     }
   };
 
+  // Convert Balance to BalanceInfo.
   public func balanceInfo(balance: Balance) : BalanceInfo {
     { icp = { e8s = balance.icp.e8s }; cycle = balance.cycle }
   };
 
+  // Convert Canister to CanisterInfo.
   public func canisterInfo(canister: Canister) : CanisterInfo {
     { id = canister.id;
       first_checked = canister.first_checked;
       last_checked = canister.last_checked;
       last_checked_balance = getCanisterCycle(canister);
-      average_balance = getCanisterDailyAverage(canister);
+      average_balance = getCanisterAverageCycle(canister);
       total_allocation = getCanisterAllocation(canister);
       total_donated = getCanisterDonated(canister);
       usage = Queue.toArray(canister.usage);
@@ -129,6 +129,7 @@ module Util {
     }
   };
 
+  // Convert Allocation to AllocationInfo.
   public func allocationInfo(allocation: Allocation) : AllocationInfo {
     { canister = canisterInfo(allocation.canister);
       alias = Option.get(allocation.alias, "");
@@ -136,6 +137,8 @@ module Util {
       donated = allocation.donated; }
   };
 
+  // Convert User to UserInfo. The 'self' parameter (tipjar's canister id)
+  // is used to calculate account number.
   public func userInfo(self: Principal, user: User) : UserInfo {
     let subaccount = Util.principalToSubAccount(user.id);
     let account = toHex(AccountId.fromPrincipal(self, ?subaccount));
@@ -158,7 +161,8 @@ module Util {
     })
   };
 
-  // Return false if it is already delegated.
+  // Set a user's delegate field. Note that this doesn't call 'transferAccount'.
+  // Return false if the user is already delegated.
   public func delegateUser(user: User, delegate: Principal) : Bool {
     switch (user.delegate) {
       case null { user.delegate := ?delegate; true };
@@ -166,9 +170,11 @@ module Util {
     }
   };
 
-  // transfer everything except ICP
+  // Transfer everything (except ICP balance) from one User to another User.
+  // For the remaining ICP balance, it will still require the 'from_user' to 'poll'
+  // and then it will be converted into cycles and deposit to 'to_user' account.
   public func transferAccount(from_user: User, to_user: User) {
-    assert(Option.get(Option.map(from_user.delegate, 
+    assert(Option.get(Option.map(from_user.delegate,
       func (id: Principal) : Bool { id == to_user.id }), false));
     let now = Time.now();
     to_user.balance.cycle := to_user.balance.cycle + from_user.balance.cycle;
@@ -197,10 +203,12 @@ module Util {
     }
   };
 
+  // Lookup a user by id.
   public func findUser(users: Queue<User>, id: Principal) : ?User {
     Queue.find(users, eqId(id))
   };
 
+  // Return a new 'User' struct, filled with default values.
   public func newUser(id: Principal) : User {
     { id = id;
       var delegate = null;
@@ -211,6 +219,7 @@ module Util {
     };
   };
 
+  // Same as 'findUser', but will create a new user if it doesn't already exist.
   public func findOrCreateNewUser(users: Queue<User>, id: Principal) : User {
     switch (findUser(users, id)) {
       case (?user) user;
@@ -223,11 +232,13 @@ module Util {
     }
   };
 
+  // Set the status field of a user (and last_updated).
   public func setUserStatus(user: User, status: ?UserStatus) {
       user.status := status;
       user.last_updated := Time.now();
   };
 
+  // Set the ICP balance of a user (and last_updated if the balance has changed).
   public func setUserICP(user: User, icp: Token) : Bool {
     if (icp.e8s != user.balance.icp.e8s) {
       user.balance.icp.e8s := icp.e8s;
@@ -236,6 +247,7 @@ module Util {
     } else false
   };
 
+  // Set the cycle balance of a user (and last_updated if the balance has changed).
   public func setUserCycle(user: User, cycle: Cycle) : Bool {
     if (cycle != user.balance.cycle) {
       user.balance.cycle := cycle;
@@ -244,42 +256,56 @@ module Util {
     } else false
   };
 
+  // Return the last known cycle balance of a canister.
+  // Note that we have an invariant that its cycle balance history is non-empty.
+  // This is guaranteed at the creation of a canister.
   public func getCanisterCycle(canister: Canister) : Cycle {
     unwrap(Queue.last(canister.cycle_balances))
   };
 
+  // Return the total cycle allocation of a canister from all its donors.
   public func getCanisterAllocation(canister: Canister) : Cycle {
-    Queue.fold(canister.donors, 0, 
+    Queue.fold(canister.donors, 0,
       func(s: Cycle, alloc: Donor) : Cycle { s + alloc.allocation.allocated });
   };
 
+  // Return the total donated cycle of a canister from all its donors.
   public func getCanisterDonated(canister: Canister) : Cycle {
-    Queue.fold(canister.donors, 0, 
+    Queue.fold(canister.donors, 0,
         func(s: Cycle, alloc: Donor) : Cycle { s + alloc.allocation.donated });
   };
 
-  // Round up cycle to avoid falling average trap
+  // Round up cycle to the nearest 1TC. This is used to avoid getting
+  // a lower and lower average over time.
   public func roundUp(cycle: Cycle) : Cycle {
     (cycle + 999_999_999_999) / 1_000_000_000_000 * 1_000_000_000_000
   };
 
-  public func getCanisterDailyAverage(canister: Canister) : Cycle {
+  // Return the average cycle balance of a canister (over the past MAX_HISTORY
+  // number of checks).
+  public func getCanisterAverageCycle(canister: Canister) : Cycle {
     let cycles = canister.cycle_balances;
     Queue.fold(cycles, 0, Nat.add) / Queue.size(cycles)
   };
 
-  public func setCanisterCycle(canister: Canister, cycle: Cycle) {
-    while (Queue.size(canister.cycle_balances) >= MAX_CYCLE_HISTORY) {
+  // Add a new cycle check of a canister (and update its last_checked).
+  public func addCanisterCycleCheck(canister: Canister, cycle: Cycle) {
+    while (Queue.size(canister.cycle_balances) >= MAX_HISTORY) {
       ignore Queue.popFront(canister.cycle_balances);
     };
     ignore Queue.pushBack(canister.cycle_balances, cycle);
     canister.last_checked := Time.now();
   };
 
-  public func deductCanisterDonation(canister: Canister, gap: Cycle) : ?Cycle {
-    if (gap == 0) { return null };
+  // Deduct required cycles from all donors of a canister in order to fill
+  // the gap. Return the actual total deduction, which may be lower than the
+  // requested gap.
+  // Each donor will contribute according to the ratio of their allocation
+  // over the total allocation.
+  public func deductCanisterDonation(canister: Canister, gap: Cycle) : Cycle {
+    if (gap == 0) { return 0 };
     let total_allocated = getCanisterAllocation(canister);
-    if (total_allocated == 0) { return null };
+    if (total_allocated == 0) { return 0 };
     var total = 0;
     for (donor in Queue.toIter(canister.donors)) {
       let allocation = donor.allocation;
@@ -291,15 +317,19 @@ module Util {
       allocation.allocated := allocation.allocated - to_donate;
       allocation.donated := allocation.donated + to_donate;
     };
-    ?total
+    total
   };
 
+  // Lookup a user's allocation for the given canister.
   public func findAllocation(user: User, canister_id: Principal) : ?Allocation {
     Queue.find(user.allocations, func (alloc: Allocation) : Bool { alloc.canister.id == canister_id })
   };
 
-  // Return max usable cycle if it is less than required.
-  public func setAllocation(user: User, canister: Canister, alias: ?Text, amount: Cycle) : Result.Result<Allocation, Cycle> {
+  // Set a user's allocation for a given canister.
+  // The allocation could fail due to insufficient balance, and in that case the
+  // max usable cycle is returned.
+  public func setAllocation(user: User, canister: Canister, alias: ?Text, amount: Cycle)
+      : Result.Result<Allocation, Cycle> {
     let now = Time.now();
     func setAlias(alloc: Allocation) {
       let set = switch (alloc.alias, alias) {
@@ -324,7 +354,7 @@ module Util {
       case null {
         if (user.balance.cycle >= amount) {
           ignore setUserCycle(user, user.balance.cycle - amount);
-          let alloc : Allocation = { canister = canister; var alias = null; 
+          let alloc : Allocation = { canister = canister; var alias = null;
                                      var allocated = amount; var donated = 0 };
           let donor : Donor = { id = user.id; allocation = alloc };
           ignore Queue.pushFront(donor, canister.donors);
@@ -332,32 +362,38 @@ module Util {
           user.last_updated := Time.now();
           setAlias(alloc);
           #ok(alloc)
-        } else { 
+        } else {
           #err(user.balance.cycle)
         }
       };
     }
   };
 
+  // Remove a donor from the canister's donor list.
   public func removeDonor(canister: Canister, id: Principal) : ?Donor {
     Queue.removeOne(canister.donors, eqId(id))
   };
 
+  // Add a new cycle dontation to a canister's donation history
+  // (of MAX_HISTORY number of entries).
   public func addDonation(canister: Canister, cycle: Cycle) {
-    while (Queue.size(canister.usage) >= MAX_CYCLE_HISTORY) {
+    while (Queue.size(canister.usage) >= MAX_HISTORY) {
       ignore Queue.popFront(canister.usage);
     };
     let now = Time.now();
-    ignore Queue.pushBack(canister.usage, 
+    ignore Queue.pushBack(canister.usage,
       { cycle = cycle; period = now - canister.last_donated });
     canister.last_donated := now;
   };
 
+  // Lookup a canister by id.
   public func findCanister(canisters: Queue<Canister>, id: Principal) : ?Canister {
     Queue.find(canisters, eqId(id))
   };
 
-  public func findOrAddCanister(canisters: Queue<Canister>, id: Principal, cycle: Cycle) : Canister {
+  // Same as 'findCanister' but will create a new canister if it didn't exist.
+  public func findOrAddCanister(canisters: Queue<Canister>, id: Principal, cycle: Cycle)
+      : Canister {
     switch (findCanister(canisters, id)) {
       case (?canister) canister;
       case null {
@@ -378,6 +414,7 @@ module Util {
     }
   };
 
+  // Helper function to be used with 'find' calls.
   public func eqId(id: Principal) : { id: Principal } -> Bool {
     func (x: { id: Principal }) { x.id == id }
   };
