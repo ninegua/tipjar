@@ -159,37 +159,12 @@ shared (installation) actor class TipJar() = self {
     userInfo(Option.get(findUser(arg.caller), Util.newUser(arg.caller)))
   };
 
-  stable var whitelist : Queue<{id: Principal}> = Queue.empty();
-
-  // Add a user id to the whitelist. Used by admin for beta testing only.
-  public shared (arg) func allow(id: Principal) {
-    assert(arg.caller == OWNER);
-    ignore Queue.pushFront({id = id}, whitelist);
-  };
-
   // Test function that directly calls ledger's notify. Used by admin for debugging only.
   public shared (arg) func testNotify(id: Principal, icp: Token, height: Ledger.BlockIndex) {
     assert(arg.caller == OWNER);
     let user = Option.unwrap(findUser(id));
     let deposit : Deposit = { user = user; icp = icp };
     depositing := ?(deposit, #Notify(height));
-  };
-
-  // Test function that directly calls delegate. Used by admin for debugging only.
-  public shared (arg) func testDelegate(from: Principal, to: Principal) {
-    assert(arg.caller == OWNER);
-    switch (findUser(from), findOrCreateNewUser(to)) {
-      case (?from, to) {
-       assert(Util.delegateUser(from, to.id));
-       let log = logger("testDelegate");
-       ignore log("Delegated " # debug_show({ from = from.id; to = to.id;
-                                              balance = from.balance }));
-        Util.transferAccount(from, to);
-      };
-      case _ {
-        assert(false);
-      };
-    }
   };
 
   // Return self check statistics. Used by admin for debugging only.
@@ -245,9 +220,6 @@ shared (installation) actor class TipJar() = self {
   // Return updated UserInfo if successful.
   public shared (arg) func allocate(alloc: AllocationInput)
       : async Result<Util.UserInfo, AllocationError> {
-    if (Option.isNull(Queue.find<{id:Principal}>(whitelist, Util.eqId(arg.caller)))) {
-      return #err(#AccessDenied)
-    };
     let log = logger("allocate");
     switch (alloc.alias) {
       case null ();
