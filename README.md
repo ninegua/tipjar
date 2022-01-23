@@ -24,6 +24,8 @@ Donate [cycles] to your favorite [canisters] on the [Internet Computer] and keep
 
 Please check out the list of [Frequently Asked Questions](FAQ.md).
 
+I also wrote down [some random notes](NOTES.md) on the design decisions in making this app.
+
 **Releases**
 
 - Version 0.0.0 (retired)
