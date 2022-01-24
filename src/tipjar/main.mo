@@ -239,8 +239,8 @@ shared (installation) actor class TipJar() = self {
       case null { #err(#UserDoesNotExist) };
       case (?user) {
         if (Queue.size(user.allocations) >= MAX_CANISTERS_PER_USER) {
-          return #err(#TooManyAllocations(MAX_CANISTER_PER_USER));
-        }
+          return #err(#TooManyCanisters(MAX_CANISTERS_PER_USER));
+        };
         switch (Util.findCanister(all_canisters(), alloc.canister)) {
           case (?canister) {
             let before = Util.getCanisterAllocation(canister);
