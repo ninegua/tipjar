@@ -54,6 +54,6 @@ I also wrote down [some random notes](NOTES.md) on the design decisions in makin
   The day when TipJar becomes immutable by having [the black hole] as its only controller!
 
 [cycles]: https://smartcontracts.org/docs/developers-guide/concepts/tokens-cycles.html
-[the black hole]: https://github.com/ninegua/blackhole
+[the black hole]: https://github.com/ninegua/ic-blackhole
 [canisters]: https://sdk.dfinity.org/docs/developers-guide/concepts/canisters-code.html
 [Internet Computer]: https://dashboard.internetcomputer.org
