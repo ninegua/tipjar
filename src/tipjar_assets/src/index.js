@@ -236,7 +236,7 @@ async function save_canister(tr, id, allocation) {
       let err = result.err;
       if ("UserDoesNotExist" in err) {
       } else if ("CanisterStatusError" in err) {
-        error_p.innerText = explain_canister_status_error(
+        error_p.innerHTML = explain_canister_status_error(
           err.CanisterStatusError
         );
       } else if ("InsufficientBalance" in err) {
@@ -434,8 +434,8 @@ function explain_canister_status_error(msg) {
   if (msg.indexOf("Only the controllers") >= 0) {
     reason =
       "Cannot obtain this canister's status. " +
-      "Please ask its developer to add the black hole canister" +
-      " e3mmv-5qaaa-aaaah-aadma-cai to its controller list.";
+      "Please ask its developer to <a href='#why-am-i-getting-an-error-when-trying-to-add-a-canister'>add the black hole canister" +
+      " e3mmv-5qaaa-aaaah-aadma-cai</a> to its controller list.";
   }
   return reason;
 }
@@ -482,7 +482,7 @@ async function add_canister(evt) {
         error_p.innerText =
           "You need to send in some ICPs first before adding a canister.";
       } else if ("CanisterStatusError" in err) {
-        error_p.innerText = explain_canister_status_error(
+        error_p.innerHTML = explain_canister_status_error(
           err.CanisterStatusError
         );
       } else {
