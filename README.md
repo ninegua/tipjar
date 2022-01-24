@@ -10,12 +10,12 @@ Donate [cycles] to your favorite [canisters] on the [Internet Computer] and keep
 - [x] Deposit ICPs that are automatically converted into cycles.
 - [x] Name and choose your favorite canisters to contribute to.
 - [x] Monitor canister cycle level and top up whenever it goes lower than the daily average.
-- [x] Deduct cycle funds to make donation based on contribution percentage of each user.
+- [x] Deduct cycle funds to make donations based on the contribution percentage of each user.
 - [x] Support Internet Identity login.
 - [x] Support "add to home screen" on mobile browsers.
 - [x] Support import of PEM file for those who do not have or use Internet Identity.
 - [ ] Blacklist canisters that attempt to rug pull.
-- [ ] [Canister list pagenation and searchbox](https://github.com/ninegua/tipjar/issues/3).
+- [ ] [Canister list pagination and search box](https://github.com/ninegua/tipjar/issues/3).
 - [ ] [Allow canister controllers to authorize their own donation page](https://github.com/ninegua/tipjar/issues/2).
 - [ ] [Support canister bundles and identification](https://github.com/ninegua/tipjar/issues/2).
 - [ ] Support one time donation in addition to daily automatic ones.
@@ -51,9 +51,9 @@ I also wrote down [some random notes](NOTES.md) on the design decisions in makin
 
 - Version 0.4.0
 
-  The day when TipJar becomes immutable by having [the black hole] as its only controller!
+  The day when TipJar becomes immutable by having the [black hole] as its only controller!
 
 [cycles]: https://smartcontracts.org/docs/developers-guide/concepts/tokens-cycles.html
-[the black hole]: https://github.com/ninegua/ic-blackhole
+[black hole]: https://github.com/ninegua/ic-blackhole
 [canisters]: https://sdk.dfinity.org/docs/developers-guide/concepts/canisters-code.html
 [Internet Computer]: https://dashboard.internetcomputer.org
