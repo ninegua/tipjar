@@ -15,9 +15,9 @@ Donate [cycles] to your favorite [canisters] on the [Internet Computer] and keep
 - [x] Support "add to home screen" on mobile browsers.
 - [x] Support import of PEM file for those who do not have or use Internet Identity.
 - [ ] Blacklist canisters that attempt to rug pull.
-- [ ] Canister list pagenation and searchbox.
-- [ ] Allow canister controllers to authorize their own donation page.
-- [ ] Support canister bundles and identification.
+- [ ] [Canister list pagenation and searchbox](https://github.com/ninegua/tipjar/issues/3).
+- [ ] [Allow canister controllers to authorize their own donation page](https://github.com/ninegua/tipjar/issues/2).
+- [ ] [Support canister bundles and identification](https://github.com/ninegua/tipjar/issues/2).
 - [ ] Support one time donation in addition to daily automatic ones.
 
 **Got questions? We have answers!**
@@ -35,11 +35,11 @@ I also wrote down [some random notes](NOTES.md) on the design decisions in makin
 - Version 0.0.1 (live)
 
   There could still be bugs to iron out over time, please [report issues on GitHub](https://github.com/ninegua/tipjar/issues).
-  Source code is being cleaned up and will be released in a week or two.
+  Source code is already released.
 
 - Version 0.1.0
  
-  Ready when the source code is released.
+  Ready when existing features are sufficiently tested.
 
 - Version 0.2.0
 
