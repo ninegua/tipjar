@@ -702,10 +702,6 @@ window.onload = () => {
     let account_qrcode = document.getElementById("account_qrcode");
     account_qrcode.classList.add("show-div");
     account_qrcode.classList.remove("hide-div-mobile");
-    let p = document.createElement("p");
-    p.classList.add("scan-text");
-    p.innerText = "Principal ID: " + agent.state.principal.toString();
-    account_qrcode.appendChild(p);
   };
   document.getElementById("how-it-works").onclick = show_faq;
   document.getElementById("login_button").onclick = start_ii_login;
