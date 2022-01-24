@@ -250,6 +250,8 @@ async function save_canister(tr, id, allocation) {
       } else if ("AliasTooLong" in err) {
         error_p.innerText = `The alias cannot be more than ${err.AliasTooLong} characters.`;
         document.getElementById(`alias_${id}`).focus();
+      } else if ("TooManyCanisters" in err) {
+        error_p.innerText = `You have reached the maximum number of canisters allowed per user: ${err.TooManyCanisters}.`;
       } else {
         error_p.innerText = "Unknown error. Please try again later.";
       }

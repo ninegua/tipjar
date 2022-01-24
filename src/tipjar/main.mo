@@ -30,7 +30,7 @@ shared (installation) actor class TipJar() = self {
   let FEE = 10000 : Nat64;
 
   // Minimum ICP deposit required before converting to cycles.
-  let MIN_DEPOSIT = FEE * 2;
+  let MIN_DEPOSIT = FEE * 10;
 
   // The current method of converting ICP to cycles is by sending ICP to the
   // cycle minting canister with a memo.
@@ -45,6 +45,9 @@ shared (installation) actor class TipJar() = self {
 
   // The minimum cycle balance for the TipJar canister to keep working.
   let MIN_RESERVE = 1_000_000_000_000;
+
+  // The maximum number of canisters per user account.
+  let MAX_CANISTERS_PER_USER = 200;
 
   // Interface of the IC00 management canister. At the moment we only need
   // 'deposit_cycles' to unconditionally send cycles to another canister.
@@ -207,6 +210,7 @@ shared (installation) actor class TipJar() = self {
     #UserDoesNotExist;
     #AliasTooLong: Nat;
     #AliasTooShort: Nat;
+    #TooManyCanisters: Nat;
     #AccessDenied;
   };
 
@@ -234,6 +238,9 @@ shared (installation) actor class TipJar() = self {
     switch (findUser(arg.caller)) {
       case null { #err(#UserDoesNotExist) };
       case (?user) {
+        if (Queue.size(user.allocations) >= MAX_CANISTERS_PER_USER) {
+          return #err(#TooManyAllocations(MAX_CANISTER_PER_USER));
+        }
         switch (Util.findCanister(all_canisters(), alloc.canister)) {
           case (?canister) {
             let before = Util.getCanisterAllocation(canister);
