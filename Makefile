@@ -1,7 +1,9 @@
-SRC_DIR=./src/tipjar
 OBJ_DIR=.dfx/ic/canisters
 DIST_DIR=./dist
-SRC=$(SRC_DIR)/main.mo $(SRC_DIR)/Util.mo
+IMAGES_SRC=$(wildcard src/tipjar_assets/assets/*.png) $(wildcard src/tipjar_assets/assets/*/*/*.png) $(wildcard src/tipjar_assets/assets/*.ico)
+ASSETS_SRC=$(wildcard src/tipjar_assets/src/*.html) $(wildcard src/tipjar_assets/src/*.js) src/tipjar_assets/assets/tipjar.webmanifest src/tipjar_assets/assets/faq.html
+MOTOKO_SRC=$(wildcard src/tipjar/*.mo) 
+SRC=$(MOTOKO_SRC) $(ASSETS_SRC) $(IMAGES_SRC)
 
 $(OBJ_DIR)/tipjar/tipjar.wasm $(OBJ_DIR)/tipjar/tipjar.did $(DIST_DIR)/index.html $(DIST_DIR)/index.js &: $(SRC)
 	dfx build --network=ic
