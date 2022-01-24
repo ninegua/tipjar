@@ -1,4 +1,13 @@
 {
+  "ledger": {
+    "ic": "ryjl3-tyaaa-aaaaa-aaaba-cai"
+  },
+  "logger": {
+    "ic": "huh2c-uqaaa-aaaab-aabaq-cai"
+  },
+  "blackhole": {
+    "ic": "e3mmv-5qaaa-aaaah-aadma-cai"
+  },
   "tipjar": {
     "ic": "k54e2-ciaaa-aaaab-aaaka-cai"
   },

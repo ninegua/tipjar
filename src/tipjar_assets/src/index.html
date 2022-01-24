@@ -1,62 +1,396 @@
-<!DOCTYPE html>
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width" />
+    <meta name="apple-mobile-web-app-title" content="Tip Jar" />
     <title>TipJar: Donate Cycles to Canisters</title>
     <base href="/" />
+    <link rel="manifest" href="/tipjar.webmanifest" />
+    <link rel="apple-touch-startup-image" href="/_/raw/icon.png" />
+    <link rel="apple-touch-icon" href="/_/raw/icon.png" />
+    <link rel="icon" type="image/png" href="icon.png" />
     <link rel="stylesheet" href="https://cdn.simplecss.org/simple.min.css" />
+    <link
+      rel="stylesheet"
+      href="https://use.fontawesome.com/releases/v5.0.7/css/all.css"
+    />
     <style>
+      a,
+      a:visited {
+        text-decoration: none;
+      }
+      a:hover {
+        cursor: pointer;
+      }
+      input:not(enabled):hover {
+        cursor: default;
+      }
       ol {
-        padding-left: 1rem;
+        padding-left: 1.3rem;
+      }
+      button {
+        font-size: 0.9rem;
       }
       input {
-        font-size: 1.075rem;
+        font-size: 0.9rem;
         font-family: var(--mono-font);
+      }
+      pre {
+        font-size: 0.85rem;
+      }
+      th {
+        font-weight: normal;
+        min-width: 5rem;
+      }
+      .left {
+        text-align: left;
+      }
+      .right {
+        text-align: right;
+      }
+      .center {
+        display: flex;
+        justify-content: center;
+      }
+      code {
+        font-size: 0.9rem;
+      }
+      .input-label {
+        display: inline-block;
+        width: 10rem;
+        min-width: 8rem;
+      }
+      .canister-button {
+        width: 5rem;
+        margin-left: 1rem;
+        margin-right: 1rem;
+      }
+      .input-box-wrapper {
+        display: inline-block;
+        width: 60%;
+        margin: auto;
+        position: relative;
+      }
+      .input-box-wrapper i {
+        font-style: normal;
+        padding: 4px 5px 2px 5px;
+        position: absolute;
+        top: 4px;
+        right: 4px;
+        z-index: 1;
+        pointer-events: none;
+        color: var(--text-light);
+      }
+      .opaque {
+        background: white;
+      }
+      .input-box-wrapper input {
+        cursor: pointer;
+        width: 100%;
+      }
+      #top_info {
+        margin: 1em auto 1em auto;
+      }
+      #top_info .input-box-wrapper {
+        width: 25rem;
+      }
+      #top_info .input-box-wrapper input {
+        color: var(--accent);
+      }
+      #login_first {
+        float: right;
+      }
+      #qrcode_section {
+        float: right;
+        text-align: center;
+        position: relative;
+        z-index: 2;
+      }
+      .scan-text {
+        margin: 0;
+        font-size: 0.6rem;
+      }
+      .table-inner {
+        width: 80%;
+        margin-top: 0.8em;
+      }
+      .show-div-mobile {
+        display: none;
+      }
+      .hide-div-mobile {
+        display: block;
+      }
+      @media only screen and (max-width: 720px) {
+        .show-div-mobile {
+          display: block;
+        }
+        .hide-div-mobile {
+          display: none;
+        }
+        #qrcode_section {
+          float: none;
+          display: flex;
+          justify-content: center;
+        }
+        #top_info .input-box-wrapper {
+          width: 100%;
+        }
+        .table-inner {
+          width: 100%;
+        }
+        .input-box-wrapper {
+          width: 100%;
+        }
+      }
+      #add_canister_form {
+        margin-top: 8px;
+      }
+      .error {
         color: var(--code);
       }
-      .todo {
-        color: gray;
+      .grayedout,
+      a .grayedout {
+        font-size: 0.9rem;
+        color: var(--text-light);
+        font-style: normal;
+      }
+      .inactive {
+        pointer-events: none;
+        background: #fafafa;
+        border: 0;
+      }
+      #stats {
+        font-size: 0.8rem;
+        color: var(--preformatted);
+      }
+      header {
+        padding-top: 0.1rem;
+        padding-bottom: 0.1rem;
+      }
+      .fixed-th {
+        width: 100%;
+      }
+      #qrcode_placeholder {
+        margin: 102px 93px 0 0;
+      }
+      .show-div {
+        display: block;
+      }
+      .hide-div {
+        display: none;
+      }
+      #import_pem_div {
+        margin-top: 0.5rem;
+        font-size: 80%;
+        color: var(--text-light);
+      }
+      #login_spinner {
+        margin-top: 1rem;
+      }
+      #logout_spinner {
+        margin-left: 1rem;
+      }
+      .max {
+        float: right;
+      }
+      .blur {
+        filter: progid:DXImageTransform.Microsoft.Blur(PixelRadius='5');
+        -webkit-filter: url(#blur-filter);
+        filter: url(#blur-filter);
+        -webkit-filter: blur(5px);
+        filter: blur(5px);
+      }
+      .blur-svg {
+        display: none;
+      }
+      .login-button {
+        width: 6rem;
+        font-size: 1rem;
+      }
+      .login-button i {
+        font-size: 0.5rem;
+        font-style: normal;
       }
     </style>
   </head>
   <body>
     <header>
-      <h1>Donate Cycles to Canisters</h1>
+      <h2>Canister Tip Jar</h2>
+      <span id="stats">&nbsp;</span>
     </header>
     <main>
-      <form>
-        <p>
-          <label>Account ID</label><br />
-          <input
-            type="text"
-            id="account"
-            onclick="this.select(); document.execCommand('copy');"
-            readonly
-          />
-          <br />
-          <label>ICP Balance</label><br />
-          <input type="text" id="balance" readonly />
-          <br />
-          <label>Cycle Balance</label><br />
-          <input type="text" id="cycles" readonly />
-        </p>
-      </form>
-      <div>
-        <strong>STEPS:</strong><br />
-        <ol>
-          <li>Send some ICP to the above account ID.</li>
-          <li>Watch the ICP balance is received.</li>
-          <li>And the ICP is then automatically converted into cycles.</li>
-          <li class="todo">
-            Name or choose one or more canisters to contribute to. (TODO)
-          </li>
-          <li class="todo">
-            Your cycle balance will be donated daily to them. (TODO)
-          </li>
-        </ol>
-      </div>
+      <section id="info_section" hidden>
+        <div style="position: relative">
+          <div id="qrcode_section">
+            <div id="login_box" hidden>
+              <button class="login-button" id="login_button">
+                Login <i>with</i><br /><i>Internet Identity</i>
+              </button>
+              <div class="scan-text">
+                or
+                <a id="import_pem_anchor">import a PEM file</a>
+                <input type="file" id="choose_pem_file" hidden />
+              </div>
+              <div id="login_spinner" hidden>
+                <i class="fas fa-spinner fa-spin"></i>
+              </div>
+            </div>
+            <div id="qr_box" hidden>
+              <div id="account_qrcode" class="hide-div-mobile">
+                <div id="qrcode_placeholder"></div>
+                <p class="scan-text">Scan Account ID</p>
+              </div>
+              <div id="show_qrcode" class="show-div-mobile">
+                <p class="scan-text">
+                  <a id="show_qrcode_anchor">Show Account QR code</a>
+                </p>
+              </div>
+              <button id="logout_button">Logout</button>
+              <span id="logout_spinner" hidden>
+                <i class="fas fa-spinner fa-spin"></i>
+              </span>
+            </div>
+          </div>
+          <div id="info_parent" class="hide-div-mobile">
+            <svg
+              version="1.1"
+              xmlns="http://www.w3.org/2000/svg"
+              xmlns:xlink="http://www.w3.org/1999/xlink"
+              class="blur-svg"
+            >
+              <defs>
+                <filter id="blur-filter">
+                  <feGaussianBlur stdDeviation="3"></feGaussianBlur>
+                </filter>
+              </defs>
+            </svg>
+            <div class="blur" id="top_info">
+              <label class="input-label">Account ID</label>
+              <div class="input-box-wrapper">
+                <div id="account_id_spinner">
+                  <i class="fas fa-spinner fa-spin"></i>
+                </div>
+                <div id="account_id_copier" hidden>
+                  <i class="fas fa-copy opaque"></i>
+                </div>
+                <input
+                  type="text"
+                  id="account_id"
+                  onclick="this.select(); document.execCommand('copy');"
+                  readonly
+                />
+              </div>
+              <br />
+              <label class="input-label">ICP Balance</label>
+              <div class="input-box-wrapper">
+                <div id="icp_balance_spinner" hidden>
+                  <i class="fas fa-spinner fa-spin"></i>
+                </div>
+                <input type="text" id="icp_balance" readonly />
+              </div>
+              <br />
+              <label class="input-label">Cycle Balance</label>
+              <div class="input-box-wrapper">
+                <div id="cycle_balance_spinner" hidden>
+                  <i class="fas fa-spinner fa-spin"></i>
+                </div>
+                <input type="text" id="cycle_balance" readonly />
+              </div>
+            </div>
+          </div>
+          <p class="error" id="banner_error"></p>
+        </div>
+        <div>
+          <strong>Steps:</strong><br />
+          <ol>
+            <li>
+              Login with Internet Identity (or use a
+              <a id="temporary_account">temporary account</a>).
+            </li>
+            <li>
+              Send some ICP (from a wallet) to the Account ID shown above.
+            </li>
+            <li>
+              Watch the ICP balance is received and auto-converted to cycles.
+            </li>
+            <li>Name or choose one or more canisters to contribute to.</li>
+            <li>
+              Canisters will be automatically topped up when they run low on
+              cycles.
+            </li>
+          </ol>
+          <p>
+            You can also read more about
+            <a id="how-it-works" href="#faq_section">how it works</a>.
+          </p>
+        </div>
+      </section>
+      <section id="canister_section" hidden>
+        <strong>My Donor Recipients</strong>
+        <table>
+          <thead>
+            <tr>
+              <th class="fixed-th">Canister</th>
+              <th class="right">Allocated</th>
+              <th class="right">Donated</th>
+            </tr>
+          </thead>
+          <tbody id="canisters">
+            <tr>
+              <td colspan="3" id="login_area">
+                <div id="add_canister_form" hidden>
+                  <div class="center">
+                    <div class="table-inner">
+                      <label class="input-label" for="new_canister_id"
+                        >Canister ID</label
+                      >&nbsp;
+                      <div class="input-box-wrapper">
+                        <div id="new_canister_spinner" hidden>
+                          <i class="fas fa-spinner fa-spin"></i>
+                        </div>
+                        <input
+                          autocomplete="off"
+                          type="text"
+                          id="new_canister_id"
+                        /><br />
+                      </div>
+                      <p class="error" id="add_canister_error"></p>
+                      <div class="center">
+                        <button
+                          class="canister-button"
+                          id="commit_add_canister"
+                        >
+                          Add
+                        </button>
+                        <button
+                          class="canister-button"
+                          id="cancel_add_canister"
+                        >
+                          Cancel
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <div id="add_canister_anchor" style="width: 100%">
+                  <center>
+                    <p class="error" id="add_canister_msg"></p>
+                    <a id="add_canister">Add a canister</a>
+                    <p></p>
+                  </center>
+                </div>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </section>
+      <section id="faq_section" hidden></section>
     </main>
-    <footer><a href="https://github.com/ninegua/tipjar">Source Code</a></footer>
+    <footer>
+      <a href="https://github.com/ninegua/tipjar" target="_blank"
+        >Source Code</a
+      >
+    </footer>
   </body>
 </html>

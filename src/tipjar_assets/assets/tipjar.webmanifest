@@ -1,0 +1,18 @@
+{
+    "background_color": "#22A7F2",
+    "theme_color": "#22A7F2",
+    "description": "TipJar: Donate Cycles to Canisters",
+    "display": "standalone",
+    "icons": [
+        {
+            "src": "/_/raw/icon.png",
+            "purpose": "any",
+            "sizes": "192x192",
+            "type": "image/png"
+        }
+    ],
+    "name": "Canister Tip Jar",
+    "short_name": "Tip Jar",
+    "scope": "/",
+    "start_url": "/"
+}
