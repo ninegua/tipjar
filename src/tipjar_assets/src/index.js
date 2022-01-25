@@ -516,6 +516,7 @@ function update_login_status() {
   if (agent.is_authenticated()) {
     document.getElementById("login_box").hidden = true;
     document.getElementById("qr_box").hidden = false;
+    document.getElementById("info_parent").classList.remove("hide-div-mobile");
     document.getElementById("top_info").classList.remove("blur");
     document.getElementById("temporary_account").onclick = () => {
       document.getElementById("banner_error").innerText =

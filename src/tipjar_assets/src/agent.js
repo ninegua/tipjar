@@ -8,12 +8,6 @@ import {
   idlFactory as ledger_idl,
   canisterId as ledger_id,
 } from "../../declarations/ledger";
-/*
-import {
-  idlFactory as blackhole_idl,
-  canisterId as blackhole_id,
-} from "../../declarations/blackhole";
-*/
 import {
   idlFactory as tipjar_idl,
   canisterId as tipjar_id,
