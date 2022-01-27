@@ -2,7 +2,7 @@
 
 A random collection of notes reflecting on the design and development of the Tip Jar canister.
 
-## Do canisters dream of electric tables?
+## Do canisters dream of lookup tables?
 
 One of the early goals of this project is to eventually make the Tip Jar canister immutable.
 So I decided not to focus too much on upgrades.
