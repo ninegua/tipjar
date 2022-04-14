@@ -23,11 +23,11 @@ If I were to design data schema for a database, I'd normalize the above relation
 But this time I chose instead to maintain a graph of objects referencing each other directly.
 
 An immediate benefit is that I don't have to deal with lookup failures in my code, since there is no indirection, no reference by id, and so on.
-I felt a reief after eliminating a whole class of error handling and assertions from the code base.
+I felt a relief after eliminating a whole class of error handling and assertions from the code base.
 
 The downside, however, is that if I were to change an object type in a non-compatible way, upgrading the canister will fail.
-Recent versions of the [motoko] compiler can do a safety check to detect sub-type violations when upgrading stable variables
-But still, should such an incompatibilty arise, it will require implementing a `postupgrade` procedure to carefully migrate data from old to new.
+Recent versions of the [motoko] compiler can do a safety check to detect sub-type violations when upgrading stable variables.
+But still, should such an incompatibility arise, it will require implementing a `postupgrade` procedure to carefully migrate data from old to new.
 I had to do this a couple times, but it wasn't as bad as I had thought.
 
 This experiment offers a glimpse of the future: when we have orthogonal persistence, do old practices such as "data normalization" still make sense?
@@ -57,7 +57,7 @@ It goes through 4 stages:
 - `Mint` and `MintCalled`: Before and after sending ICP to CMC (Cycle Minting Canister) to start the minting.
 - `Notify` and `NotifyCalled`: Before and after calling notify on ledger to in order to receive the minted cycles.
 
-Note that in order to avoid re-entrancy problems, `MintCalled` and `NotifyCalled` are necessary to help remember a message has already been sent out.
+Note that in order to avoid reentrancy problems, `MintCalled` and `NotifyCalled` are necessary to help remember a message has already been sent out.
 
 I chose to implement the ICP to cycle conversion process with one job queue, and canister topping up with another job queue.
 In retrospect these two probably should be merged into a single job queue, then I wouldn't have to worry about locking at all.
