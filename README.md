@@ -1,6 +1,6 @@
 # Canister Tip Jar
 
-https://k25co-pqaaa-aaaab-aaakq-cai.ic0.app
+https://tipjar.rocks (which redirects to https://k25co-pqaaa-aaaab-aaakq-cai.ic0.app)
 
 Donate [cycles] to your favorite [canisters] on the [Internet Computer] and keep them live and healthy!
 
