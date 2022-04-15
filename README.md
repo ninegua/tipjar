@@ -56,6 +56,7 @@ I also wrote down [some random notes](NOTES.md) on the design decisions in makin
 **Local deployment**
 
 If you want to run tipjar locally in your [dfx] environment, you will need [GNU make], [curl], and a working [vessel] installation too.
+For [nix] users, simply entering `nix-shell` is enough.
 
 ```
 dfx start --background
@@ -73,3 +74,4 @@ This will start a dfx replica, download necessary files, and deploy all canister
 [curl]: https://curl.se
 [dfx]: https://smartcontracts.org/docs/quickstart/1-quickstart.html
 [vessel]: https://github.com/dfinity/vessel
+[nix]: https://nixos.org/download.html#download-nix
