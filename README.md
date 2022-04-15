@@ -53,7 +53,23 @@ I also wrote down [some random notes](NOTES.md) on the design decisions in makin
 
   The day when TipJar becomes immutable by having the [black hole] as its only controller!
 
+**Local deployment**
+
+If you want to run tipjar locally in your [dfx] environment, you will need [GNU make], [curl], and a working [vessel] installation too.
+
+```
+dfx start --background
+make deploy
+```
+
+This will start a dfx replica, download necessary files, and deploy all canisters locally.
+
+
 [cycles]: https://smartcontracts.org/docs/developers-guide/concepts/tokens-cycles.html
 [black hole]: https://github.com/ninegua/ic-blackhole
 [canisters]: https://sdk.dfinity.org/docs/developers-guide/concepts/canisters-code.html
 [Internet Computer]: https://dashboard.internetcomputer.org
+[GNU make]: https://www.gnu.org/software/make
+[curl]: https://curl.se
+[dfx]: https://smartcontracts.org/docs/quickstart/1-quickstart.html
+[vessel]: https://github.com/dfinity/vessel
