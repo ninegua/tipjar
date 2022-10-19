@@ -28,10 +28,7 @@ If there is a canister useful to you, please ask its developer to do this sooner
 The [dfx] command line is given below:
 
 ``` .shell
-dfx canister --network=ic update-settings \
-  --controller [its-current-controller-id] \
-  --controller e3mmv-5qaaa-aaaah-aadma-cai \
-  [CANISTER_ID]
+dfx canister --network ic update-settings --add-controller e3mmv-5qaaa-aaaah-aadma-cai [CANISTER_ID]
 ```
 
 ## What is a temporary account?
