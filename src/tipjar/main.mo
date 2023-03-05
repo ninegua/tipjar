@@ -610,4 +610,17 @@ shared (installation) actor class TipJar() = self {
     }
   };
 
+  //////////////////////////////////////////////////////////////////////////
+  // Backup
+  //////////////////////////////////////////////////////////////////////////
+  public shared (arg) func export_users() : async [Util.UserInfo] {
+    assert(arg.caller == OWNER);
+    Array.map(Queue.toArray(all_users()), userInfo)
+  };
+
+  public shared (arg) func export_canisters() : async [Util.CanisterInfo] {
+    assert(arg.caller == OWNER);
+    Array.map(Queue.toArray(all_canisters()), Util.canisterInfo)
+  };
+
 }
