@@ -116,6 +116,16 @@ shared (installation) actor class TipJar() = self {
     Util.findOrCreateNewUser(all_users(), id)
   };
 
+  // Find a user by account id.
+  func findUserByAccount(id: Text) : ?User {
+    let self_principal = Principal.fromActor(self);
+    Queue.find(all_users(), func (user: User) : Bool {
+      let subaccount = Util.principalToSubAccount(user.id);
+      let account = Util.toHex(AccountId.fromPrincipal(self_principal, ?subaccount));
+      return account == id;
+    })
+  };
+
   type DelegateError = {
     #UserNotFound;
     #AlreadyDelegated;
@@ -153,6 +163,37 @@ shared (installation) actor class TipJar() = self {
           #err(#AlreadyDelegated)
         }
       };
+    }
+  };
+
+  type DepositCyclesError = {
+    #UserNotFound;
+    #NoCyclesToDeposit;
+  };
+
+  type DepositCycles = {
+    #User: Principal;
+    #Account: Text;
+  };
+
+  // Deposit available cycles to the given user's cycle account.
+  // NOTE: finding user by account id may run out of execution limits before completion.
+  public shared func deposit_cycles_for(arg: DepositCycles) : async Result<Cycle, DepositCyclesError> {
+    let amount = Cycles.available();
+    if (amount == 0) {
+      return #err(#NoCyclesToDeposit);
+    };
+    let user = switch (arg) {
+      case (#User(user_id)) { findUser(user_id) };
+      case (#Account(account_id)) { findUserByAccount(account_id) };
+    };
+    switch (user) {
+      case null { #err(#UserNotFound) };
+      case (?user) {
+        let accepted = Cycles.accept(amount);
+        user.balance.cycle := user.balance.cycle + accepted;
+        return #ok(accepted)
+      }
     }
   };
 
