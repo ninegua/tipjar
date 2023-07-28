@@ -4,7 +4,7 @@ IMAGES_SRC=$(wildcard src/tipjar_assets/assets/*.png) $(wildcard src/tipjar_asse
 ASSETS_SRC=$(wildcard src/tipjar_assets/src/*.html) $(wildcard src/tipjar_assets/src/*.js) src/tipjar_assets/assets/tipjar.webmanifest src/tipjar_assets/assets/faq.html
 MOTOKO_SRC=$(wildcard src/tipjar/*.mo) 
 SRC=$(MOTOKO_SRC) $(ASSETS_SRC) $(IMAGES_SRC)
-IC_VERSION=a7058d009494bea7e1d898a3dd7b525922979039
+IC_VERSION=a17247bd86c7aa4e87742bf74d108614580f216d
 
 deploy: download
 	cd src/ledger && rm -f ledger.did && ln -s ledger.private.did ledger.did
@@ -28,11 +28,20 @@ src/ledger/ledger.wasm: src/ledger/ledger.wasm.gz
 src/ledger/ledger.wasm.gz:
 	curl -Lo $@ https://download.dfinity.systems/ic/$(IC_VERSION)/canisters/ledger-canister_notify-method.wasm.gz
 
+src/cmc/cycles-minting-canister.wasm: src/cmc/cycles-minting-canister.wasm.gz
+	gunzip -fk $<
+
+src/cmc/cycles-minting-canister.wasm.gz:
+	curl -Lo $@ https://download.dfinity.systems/ic/$(IC_VERSION)/canisters/cycles-minting-canister.wasm.gz
+
 src/ledger/ledger.private.did:
 	curl -Lo $@ https://raw.githubusercontent.com/dfinity/ic/$(IC_VERSION)/rs/rosetta-api/ledger.did
 
 src/ledger/ledger.public.did:
 	curl -Lo $@ https://raw.githubusercontent.com/dfinity/ic/$(IC_VERSION)/rs/rosetta-api/ledger_canister/ledger.did
+
+src/cmc/cmc.did:
+	curl -Lo $@ https://raw.githubusercontent.com/dfinity/ic/$(IC_VERSION)/rs/nns/cmc/cmc.did
 
 $(OBJ_DIR)/tipjar/tipjar.wasm $(OBJ_DIR)/tipjar/tipjar.did $(DIST_DIR)/index.html $(DIST_DIR)/index.js &: $(SRC)
 	dfx build --network=ic

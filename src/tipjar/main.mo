@@ -14,7 +14,10 @@ import Principal "mo:base/Principal";
 import Time "mo:base/Time";
 import TrieSet "mo:base/TrieSet";
 
-import Ledger "canister:ledger";
+//import CMC "canister:cmc";
+//import Ledger "canister:ledger";
+import CMC "ic:rkp4c-7iaaa-aaaaa-aaaca-cai";
+import Ledger "ic:ryjl3-tyaaa-aaaaa-aaaba-cai";
 import Logger "canister:logger";
 import Blackhole "canister:blackhole";
 
@@ -440,7 +443,7 @@ shared (installation) actor class TipJar() = self {
                 fee = { e8s = FEE };
                 memo = TOP_UP_CANISTER_MEMO;
                 from_subaccount = ?Blob.fromArray(from_subaccount);
-                amount = { e8s = deposit.icp.e8s - 2 * FEE };
+                amount = { e8s = deposit.icp.e8s - FEE };
                 created_at_time = null;
               });
           ignore log("AfterTransfer " # debug_show({ result = result; }));
@@ -462,35 +465,39 @@ shared (installation) actor class TipJar() = self {
       };
       case (?(deposit, #Notify(block_height))) {
         let user = deposit.user;
-        let from_subaccount = Util.principalToSubAccount(user.id);
-        let to_subaccount = Util.principalToSubAccount(Principal.fromActor(self));
         let starting_cycles = Cycles.balance();
         ignore log("BeforeNotify " #
           debug_show({ user = user.id; deposit = deposit.icp; starting_cycles = starting_cycles; }));
         try {
           depositing := ?(deposit, #NotifyCalled);
-          await Ledger.notify_dfx({
-              to_canister = CYCLE_MINTING_CANISTER;
-              block_height = block_height;
-              from_subaccount = ?Blob.fromArray(from_subaccount);
-              to_subaccount = ?Blob.fromArray(to_subaccount);
-              max_fee = { e8s = FEE };
-            });
-          let ending_cycles = Cycles.balance();
-          ignore log("AfterNotify " # debug_show({ ending_cycles = ending_cycles; }));
-          if (ending_cycles < starting_cycles) {
-            // TODO: notify user
-          } else {
-            tipjar.funded := tipjar.funded + ending_cycles - starting_cycles;
-            let beneficiary = Option.get(Option.chain(user.delegate, findUser), user);
-            let old_cycle = beneficiary.balance.cycle;
-            ignore Util.setUserCycle(beneficiary,
-              beneficiary.balance.cycle + ending_cycles - starting_cycles);
-            ignore log("TopUpCycle " # debug_show({
-              user = beneficiary.id; delegate = beneficiary.id != user.id;
-              old = old_cycle; new = beneficiary.balance.cycle; }));
-          };
-          Util.setUserStatus(user, ?#DepositSuccess);
+          let result = await CMC.notify_top_up({
+                block_index = block_height;
+                canister_id = Principal.fromActor(self);
+              });
+          switch result {
+            case (#Err(err)) {
+              ignore log("AfterNotify " #
+                debug_show({ block_index = block_height; err = err; }));
+              Util.setUserStatus(user, ?#DepositError(debug_show(err)));
+            };
+            case (#Ok(result)) {
+              let ending_cycles = Cycles.balance();
+              ignore log("AfterNotify " # debug_show({ ending_cycles = ending_cycles; }));
+              if (ending_cycles < starting_cycles) {
+                // TODO: notify user
+              } else {
+                tipjar.funded := tipjar.funded + ending_cycles - starting_cycles;
+                let beneficiary = Option.get(Option.chain(user.delegate, findUser), user);
+                let old_cycle = beneficiary.balance.cycle;
+                ignore Util.setUserCycle(beneficiary,
+                  beneficiary.balance.cycle + ending_cycles - starting_cycles);
+                ignore log("TopUpCycle " # debug_show({
+                  user = beneficiary.id; delegate = beneficiary.id != user.id;
+                  old = old_cycle; new = beneficiary.balance.cycle; }));
+              };
+              Util.setUserStatus(user, ?#DepositSuccess);
+            }
+          }
         } catch(err) {
           Util.setUserStatus(user, ?#DepositError(Error.message(err)));
           ignore log("AfterNotify " # show_error(err))
