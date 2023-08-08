@@ -116,6 +116,17 @@ shared (installation) actor class TipJar() = self {
     Util.findOrCreateNewUser(all_users(), id)
   };
 
+  // Find a user by account id, and return user's principal.
+  // FIXME: It may run out of execution limits before completion.
+  public shared query func findUserByAccount(id: Text) : async ?Principal {
+    let self_principal = Principal.fromActor(self);
+    Option.map(Queue.find(all_users(), func (user: User) : Bool {
+      let subaccount = Util.principalToSubAccount(user.id);
+      let account = Util.toHex(AccountId.fromPrincipal(self_principal, ?subaccount));
+      return account == id;
+    }), func (user: User) : Principal { user.id })
+  };
+
   type DelegateError = {
     #UserNotFound;
     #AlreadyDelegated;
@@ -153,6 +164,32 @@ shared (installation) actor class TipJar() = self {
           #err(#AlreadyDelegated)
         }
       };
+    }
+  };
+
+  type DepositCyclesError = {
+    #UserNotFound;
+    #NoCyclesToDeposit;
+  };
+
+  type DepositCycles = {
+    #User: Principal;
+    #Account: Text;
+  };
+
+  // Deposit available cycles to the given user's cycle account.
+  public shared func depositCyclesFor(id: Principal) : async Result<Cycle, DepositCyclesError> {
+    let amount = Cycles.available();
+    if (amount == 0) {
+      return #err(#NoCyclesToDeposit);
+    };
+    switch (findUser(id)) {
+      case null { #err(#UserNotFound) };
+      case (?user) {
+        let accepted = Cycles.accept(amount);
+        user.balance.cycle := user.balance.cycle + accepted;
+        return #ok(accepted)
+      }
     }
   };
 
