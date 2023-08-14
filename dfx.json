@@ -1,9 +1,39 @@
 {
   "canisters": {
+    "cmc": {
+      "type": "custom",
+      "wasm": "",
+      "candid": "src/cmc/cmc.did",
+      "remote": {
+        "candid": "src/cmc/cmc.did",
+        "id": {
+          "ic": "rkp4c-7iaaa-aaaaa-aaaca-cai",
+          "local": "rkp4c-7iaaa-aaaaa-aaaca-cai"
+        }
+      }
+    },
+    "ledger": {
+      "type": "custom",
+      "wasm": "",
+      "candid": "src/ledger/ledger.did",
+      "remote": {
+        "candid": "src/ledger/ledger.did",
+        "id": {
+          "ic": "ryjl3-tyaaa-aaaaa-aaaba-cai",
+          "local": "ryjl3-tyaaa-aaaaa-aaaba-cai"
+        }
+      }
+    },
     "blackhole": {
       "type": "custom",
       "candid": "src/blackhole/blackhole.did",
-      "wasm": "src/blackhole/blackhole-opt.wasm"
+      "wasm": "src/blackhole/blackhole-opt.wasm",
+      "remote": {
+        "candid": "src/blackhole/blackhole.did",
+        "id": {
+          "ic": "e3mmv-5qaaa-aaaah-aadma-cai"
+        }
+      }
     },
     "logger": {
       "main": "src/logger/TextLogger.mo",
