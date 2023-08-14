@@ -14,10 +14,8 @@ import Principal "mo:base/Principal";
 import Time "mo:base/Time";
 import TrieSet "mo:base/TrieSet";
 
-//import CMC "canister:cmc";
-//import Ledger "canister:ledger";
-import CMC "ic:rkp4c-7iaaa-aaaaa-aaaca-cai";
-import Ledger "ic:ryjl3-tyaaa-aaaaa-aaaba-cai";
+import CMC "canister:cmc";
+import Ledger "canister:ledger";
 import Logger "canister:logger";
 import Blackhole "canister:blackhole";
 
