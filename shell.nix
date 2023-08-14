@@ -1,7 +1,7 @@
 { pkgs ? import <nixpkgs> { } }:
 let
   dfx-env = import (fetchTarball
-    "https://github.com/ninegua/ic-nix/releases/download/20230101/dfx-env.tar.gz")
+    "https://github.com/ninegua/ic-nix/releases/download/20230704/dfx-env.tar.gz")
     { };
 in dfx-env.overrideAttrs (old: {
   nativeBuildInputs = old.nativeBuildInputs ++ [
