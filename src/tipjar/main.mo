@@ -7,6 +7,7 @@ import Error "mo:base/Error";
 import Hash "mo:base/Hash";
 import Int "mo:base/Int";
 import Nat "mo:base/Nat";
+import Nat64 "mo:base/Nat64";
 import Nat8 "mo:base/Nat8";
 import Option "mo:base/Option";
 import Result "mo:base/Result";
@@ -38,8 +39,11 @@ shared (installation) actor class TipJar() = self {
   let CYCLE_MINTING_CANISTER = Principal.fromText("rkp4c-7iaaa-aaaaa-aaaca-cai");
   let TOP_UP_CANISTER_MEMO = 0x50555054 : Nat64;
 
-  // Wait for CHECK_INTERVAL before checking a canister's cycle balance again.
+  // Wait for CHECK_INTERVAL before checking a canister's cycle balance again (8 hours).
   let CHECK_INTERVAL = 3600 * 8_000_000_000;
+
+  // Default wakeup period to when job queue is empty (10 seconds).
+  let DEFAULT_WAKEUP_PERIOD = 10 * 1_000_000_000;
 
   // The minimum gap (from the average) required before we topup a canister.
   let MIN_CYCLE_GAP = 100_000_000_000;
@@ -526,6 +530,7 @@ shared (installation) actor class TipJar() = self {
         let log = logger("topup");
         let average = Util.roundUp(Util.getCanisterAverageCycle(canister));
         let cycle = Util.getCanisterCycle(canister);
+        await log("checking canister " # debug_show(canister.id));
         if (cycle + MIN_CYCLE_GAP <= average) {
           let gap = Nat.sub(average, cycle);
           // can't allow tipjar to go below MIN_RESERVE.
@@ -571,11 +576,14 @@ shared (installation) actor class TipJar() = self {
     }
   };
 
-  system func heartbeat() : async () {
+  system func timer(setGlobalTimer : Nat64 -> ()) : async () {
+    let log = logger("timer");
+    await log("BeforeTimer " # debug_show(Time.now()));
+
     // Always try to poll to finish the current depositing process.
     poll();
 
-    // Always try to topup to the finish queued topup jobs.
+    // Always try to topup to finish queued topup jobs.
     topup();
 
     // Do nothing if we are stopping.
@@ -586,8 +594,7 @@ shared (installation) actor class TipJar() = self {
     switch (Queue.first(all_canisters())) {
       case null ();
       case (?canister) {
-        if (canister.last_checked + CHECK_INTERVAL < Time.now()) {
-          let log = logger("heartbeat");
+        if (canister.last_checked + CHECK_INTERVAL <= Time.now()) {
           canister.last_checked := Time.now();
           ignore Queue.rotate(all_canisters());
           ignore log("BeforeCheck " # debug_show({ canister = canister.id }));
@@ -613,7 +620,14 @@ shared (installation) actor class TipJar() = self {
           }
         }
       }
-    }
+    };
+    // Set next wakeup time
+    let next = Nat64.fromIntWrap(switch (Queue.first(all_canisters())) {
+      case null (Time.now() + DEFAULT_WAKEUP_PERIOD);
+      case (?canister) (canister.last_checked + CHECK_INTERVAL);
+    });
+    setGlobalTimer(next);
+    await log("AfterTimer " # debug_show(next));
   };
 
   //////////////////////////////////////////////////////////////////////////
