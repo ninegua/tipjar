@@ -13,7 +13,7 @@ import {
   canisterId as tipjar_id,
 } from "../../declarations/tipjar";
 import crc32 from "crc-32";
-import { sha224 } from "js-sha256";
+import { sha224 } from "@noble/hashes/sha256";
 
 function saveLocalIdentity(local) {
   let identity = JSON.stringify(local.identity);
@@ -64,7 +64,7 @@ function principalToAccountId(principal, subaccount) {
   shaObj.update("\x0Aaccount-id");
   shaObj.update(principal.toUint8Array());
   shaObj.update(subaccount ? subaccount : new Uint8Array(32));
-  const hash = new Uint8Array(shaObj.array());
+  const hash = shaObj.digest();
   const crc = crc32.buf(hash);
   return [
     (crc >> 24) & 0xff,
@@ -80,7 +80,7 @@ function principalToSubAccount(principal) {
   const subAccount = new Uint8Array(32);
   subAccount[0] = blob.length;
   subAccount.set(blob, 1);
-  return [...subAccount];
+  return subAccount;
 }
 
 function createState(identity, authenticated) {
