@@ -577,17 +577,19 @@ shared (installation) actor class TipJar() = self {
   };
 
   system func timer(setGlobalTimer : Nat64 -> ()) : async () {
+    // Do nothing if we are stopping.
+    if (stopping) return;
+
     let log = logger("timer");
     await log("BeforeTimer " # debug_show(Time.now()));
 
     // Always try to poll to finish the current depositing process.
+    // Note this only schedules an async call to poll.
     poll();
 
     // Always try to topup to finish queued topup jobs.
+    // Note this only schedules an async call to topup.
     topup();
-
-    // Do nothing if we are stopping.
-    if (stopping) return;
 
     // Check next canister to see if it needs to be topped up. Note that
     // all canisters are always arranged in the order of last_checked.
@@ -598,7 +600,8 @@ shared (installation) actor class TipJar() = self {
           canister.last_checked := Time.now();
           ignore Queue.rotate(all_canisters());
           ignore log("BeforeCheck " # debug_show({ canister = canister.id }));
-          // This canister is specially handled.
+          // Get canister's current cycle balance.
+          // Note that the tipjar canister itself requires special handling.
           let cycle = if (canister.id == Principal.fromActor(self)) {
              selfBalance()
           } else {
