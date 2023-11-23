@@ -627,7 +627,6 @@ shared (installation) actor class TipJar() = self {
     timer_in_progress := true;
 
     let log = logger("timer");
-    await log("Begin at " # debug_show(Time.now()));
 
     // Check next canister's cycle balance
     try { await check() } catch(_) {};
@@ -641,7 +640,6 @@ shared (installation) actor class TipJar() = self {
     timer_in_progress := false;
     let now = Time.now();
     setGlobalTimer(Nat64.fromIntWrap(now + POLLING_PERIOD));
-    await log("Done");
   };
 
   //////////////////////////////////////////////////////////////////////////
