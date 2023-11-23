@@ -42,8 +42,8 @@ shared (installation) actor class TipJar() = self {
   // Wait for CHECK_INTERVAL before checking a canister's cycle balance again (8 hours).
   let CHECK_INTERVAL = 3600 * 8_000_000_000;
 
-  // Default wakeup period to when job queue is empty (10 seconds).
-  let DEFAULT_WAKEUP_PERIOD = 10 * 1_000_000_000;
+  // Period to call the poll function when there are pending deposits (every 5 seconds).
+  let POLLING_PERIOD = 5 * 1_000_000_000;
 
   // The minimum gap (from the average) required before we topup a canister.
   let MIN_CYCLE_GAP = 100_000_000_000;
@@ -393,6 +393,7 @@ shared (installation) actor class TipJar() = self {
         ignore Util.setUserICP(user, icp);
         Util.setUserStatus(user, ?#DepositingCycle);
         ignore Queue.pushBack(deposits, { user = user; icp = icp });
+        // TODO: trigger poll
         return;
       };
       switch (findUser(id)) {
@@ -415,9 +416,8 @@ shared (installation) actor class TipJar() = self {
   // Poll the deposit queue to convert from ICP to Cycle.
   // Inflight deposit should block canister topup, and vice versa.
   // Note that this is called from heartbeat, but can also be called manually by admin.
-  public shared (arg) func poll() {
-    // Only admin or self can call poll.
-    if (not (arg.caller == Principal.fromActor(self) or arg.caller == OWNER)) return;
+  public shared (arg) func poll() : async () {
+    assert(arg.caller == Principal.fromActor(self) or arg.caller == OWNER);
 
     // Only start working on the next deposit if we are not stopping.
     if (Option.isNull(depositing) and not stopping) {
@@ -519,7 +519,7 @@ shared (installation) actor class TipJar() = self {
   // Poll the topup queue to top up the next canister.
   // Inflight topup should block user deposit, and vice versa.
   // Note that this is called from heartbeat, but can also be called manually by admin.
-  public shared (arg) func topup() {
+  public shared (arg) func topup() : async () {
     // Do nothing if we are already doing a topup, or caller is not self or admin.
     if (Option.isSome(topping_up) or
         not (arg.caller == Principal.fromActor(self) or arg.caller == OWNER)) return;
@@ -576,20 +576,12 @@ shared (installation) actor class TipJar() = self {
     }
   };
 
-  system func timer(setGlobalTimer : Nat64 -> ()) : async () {
-    // Do nothing if we are stopping.
-    if (stopping) return;
-
-    let log = logger("timer");
-    await log("BeforeTimer " # debug_show(Time.now()));
-
-    // Always try to poll to finish the current depositing process.
-    // Note this only schedules an async call to poll.
-    poll();
-
-    // Always try to topup to finish queued topup jobs.
-    // Note this only schedules an async call to topup.
-    topup();
+  // Check and record next canister's cycle balance if enough time has elapsed
+  // since last check. It is only meant to be called from self or owner.
+  // Note that this function must not TRAP.
+  public shared (arg) func check() : async () {
+    assert(arg.caller == Principal.fromActor(self) or arg.caller == OWNER);
+    let log = logger("check");
 
     // Check next canister to see if it needs to be topped up. Note that
     // all canisters are always arranged in the order of last_checked.
@@ -623,14 +615,33 @@ shared (installation) actor class TipJar() = self {
           }
         }
       }
-    };
-    // Set next wakeup time
-    let next = Nat64.fromIntWrap(switch (Queue.first(all_canisters())) {
-      case null (Time.now() + DEFAULT_WAKEUP_PERIOD);
-      case (?canister) (canister.last_checked + CHECK_INTERVAL);
-    });
-    setGlobalTimer(next);
-    await log("AfterTimer " # debug_show(next));
+    }
+  };
+
+  // To prevent re-entry of timer function
+  var timer_in_progress = false;
+
+  system func timer(setGlobalTimer : Nat64 -> ()) : async () {
+    // Do nothing if we are stopping.
+    if (stopping or timer_in_progress) return;
+    timer_in_progress := true;
+
+    let log = logger("timer");
+    await log("Begin at " # debug_show(Time.now()));
+
+    // Check next canister's cycle balance
+    try { await check() } catch(_) {};
+
+    // Always try to poll to finish the current depositing process.
+    try { await poll() } catch(_) {};
+
+    // Always try to topup to finish queued topup jobs.
+    try { await topup() } catch(_) {};
+
+    timer_in_progress := false;
+    let now = Time.now();
+    setGlobalTimer(Nat64.fromIntWrap(now + POLLING_PERIOD));
+    await log("Done");
   };
 
   //////////////////////////////////////////////////////////////////////////
@@ -652,6 +663,7 @@ shared (installation) actor class TipJar() = self {
             debug_show({
               owner = OWNER;
               stopping = stopping;
+              timer_in_progress = timer_in_progress;
               depositing = depositingInfo();
               topping_up = Option.map(topping_up, func(c: Canister) : Principal { c.id });
               pending_deposit = Queue.size(deposits);
