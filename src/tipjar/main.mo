@@ -2,13 +2,11 @@ import AccountId "mo:accountid/AccountId";
 import Array "mo:base/Array";
 import Blob "mo:base/Blob";
 import Cycles "mo:base/ExperimentalCycles";
-import Debug "mo:base/Debug";
 import Error "mo:base/Error";
 import Hash "mo:base/Hash";
 import Int "mo:base/Int";
 import Nat "mo:base/Nat";
 import Nat64 "mo:base/Nat64";
-import Nat8 "mo:base/Nat8";
 import Option "mo:base/Option";
 import Result "mo:base/Result";
 import Principal "mo:base/Principal";
@@ -191,7 +189,7 @@ shared (installation) actor class TipJar() = self {
     switch (findUser(id)) {
       case null { #err(#UserNotFound) };
       case (?user) {
-        let accepted = Cycles.accept(amount);
+        let accepted = Cycles.accept<system>(amount);
         user.balance.cycle := user.balance.cycle + accepted;
         return #ok(accepted)
       }
@@ -560,7 +558,7 @@ shared (installation) actor class TipJar() = self {
               debug_show({ canister = canister.id; cycle = donation }));
             let management : Management = actor("aaaaa-aa");
             try {
-              Cycles.add(donation);
+              Cycles.add<system>(donation);
               await management.deposit_cycles({canister_id = canister.id});
               ignore log("AfterDeposit")
             } catch (err) {
@@ -626,7 +624,7 @@ shared (installation) actor class TipJar() = self {
     if (stopping or timer_in_progress) return;
     timer_in_progress := true;
 
-    let log = logger("timer");
+    // let log = logger("timer");
 
     // Check next canister's cycle balance
     try { await check() } catch(_) {};
