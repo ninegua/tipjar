@@ -15,6 +15,9 @@
       href="https://use.fontawesome.com/releases/v5.0.7/css/all.css"
     />
     <style>
+      main {
+        margin-top: 5px;
+      }
       a,
       a:visited {
         text-decoration: none;
@@ -105,6 +108,9 @@
         text-align: center;
         position: relative;
         z-index: 2;
+      }
+      #show-qr-link {
+        margin-top: 8px;
       }
       .scan-text {
         margin: 0;
@@ -212,6 +218,10 @@
         font-size: 0.5rem;
         font-style: normal;
       }
+      #account_qrcode > div > img {
+        width: 100px;
+        height: 100px;
+      }
     </style>
   </head>
   <body>
@@ -239,10 +249,10 @@
             <div id="qr_box" hidden>
               <div id="account_qrcode" class="hide-div-mobile">
                 <div id="qrcode_placeholder"></div>
-                <p class="scan-text">Scan Account ID</p>
+                <p class="scan-text">Scan Account</p>
               </div>
               <div id="show_qrcode" class="show-div-mobile">
-                <p class="scan-text">
+                <p id="show-qr-link" class="scan-text">
                   <a id="show_qrcode_anchor">Show Account QR code</a>
                 </p>
               </div>
@@ -266,7 +276,12 @@
               </defs>
             </svg>
             <div class="blur" id="top_info">
-              <label class="input-label">Account ID</label>
+              <label class="input-label"
+                ><a id="account_id_switch">ICP Account</a>&nbsp;<sup
+                  style="color: grey"
+                  >➊</sup
+                ></label
+              >
               <div class="input-box-wrapper">
                 <div id="account_id_spinner">
                   <i class="fas fa-spinner fa-spin"></i>
@@ -282,12 +297,12 @@
                 />
               </div>
               <br />
-              <label class="input-label">ICP Balance</label>
+              <label class="input-label">Token Balance</label>
               <div class="input-box-wrapper">
-                <div id="icp_balance_spinner" hidden>
+                <div id="ledger_balance_spinner" hidden>
                   <i class="fas fa-spinner fa-spin"></i>
                 </div>
-                <input type="text" id="icp_balance" readonly />
+                <input type="text" id="ledger_balance" readonly />
               </div>
               <br />
               <label class="input-label">Cycle Balance</label>
@@ -296,6 +311,12 @@
                   <i class="fas fa-spinner fa-spin"></i>
                 </div>
                 <input type="text" id="cycle_balance" readonly />
+              </div>
+              <div>
+                <small style="color: gray"
+                  >➊ Toggle between the ICP Account ID and ICRC Account text
+                  encoding.</small
+                >
               </div>
             </div>
           </div>
@@ -309,11 +330,10 @@
               <a id="temporary_account">temporary account</a>).
             </li>
             <li>
-              Send some ICP (from a wallet) to the Account ID shown above.
+              Send some tokens (ICP or TCycles) to the above account, or
+              <a id="buy_tcycles">buy TCycles</a> with a credit card!
             </li>
-            <li>
-              Watch the ICP balance is received and auto-converted to cycles.
-            </li>
+            <li>Watch the token or cycle balance automatically refreshed.</li>
             <li>Name or choose one or more canisters to contribute to.</li>
             <li>
               Canisters will be automatically topped up when they run low on

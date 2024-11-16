@@ -10,13 +10,21 @@ deploy: download
 	dfx deploy
 
 download: src/blackhole/blackhole.did src/blackhole/blackhole-opt.wasm \
-	src/ledger/ledger.did src/cmc/cmc.did
+	src/ledger/ledger.did src/cmc/cmc.did \
+	src/cycles_ledger/cycles-ledger.did src/cycles_ledger/cycles-ledger.wasm.gz
 
 src/blackhole/blackhole.did:
 	curl -Lo $@ https://github.com/ninegua/ic-blackhole/releases/download/0.0.0/blackhole.did
 
 src/blackhole/blackhole-opt.wasm:
 	curl -Lo $@ https://github.com/ninegua/ic-blackhole/releases/download/0.0.0/blackhole-opt.wasm
+
+src/cycles_ledger/cycles-ledger.did:
+	curl -Lo $@ https://github.com/dfinity/cycles-ledger/releases/download/cycles-ledger-v1.0.2/cycles-ledger.did
+	sed -e 's/vec nat8/blob/' -i $@
+
+src/cycles_ledger/cycles-ledger.wasm.gz:
+	curl -Lo $@ https://github.com/dfinity/cycles-ledger/releases/download/cycles-ledger-v1.0.2/cycles-ledger.wasm.gz
 
 src/ledger/ledger.did:
 	curl -Lo $@ https://raw.githubusercontent.com/dfinity/ic/$(IC_VERSION)/rs/rosetta-api/icp_ledger/ledger.did

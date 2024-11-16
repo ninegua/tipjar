@@ -9,6 +9,7 @@ function formatICP(e8s) {
 }
 
 function formatCycle(val, d = 3) {
+  val = val ? val : 0;
   return (Number((BigInt(val) * 1000n) / 1000000000000n) / 1000).toFixed(d);
 }
 
@@ -43,13 +44,13 @@ function find_canister_allocation(canister_id) {
 function refresh_stats() {
   agent.tipjar_stats().then((stats) => {
     document.getElementById("stats").innerText = `${Number(
-      stats.donors
+      stats.donors,
     )} Donors ♡ ${Number(stats.canisters)} Canisters ♡ ${formatCycle(
       stats.donated,
-      1
+      1,
     )} of ${formatCycle(
       stats.funded + stats.donated,
-      1
+      1,
     )} Trillion Cycles Donated`;
   });
 }
@@ -74,11 +75,39 @@ function show_account_id() {
   }
 }
 
+function show_icrc1_account() {
+  document.getElementById("account_id_copier").hidden = false;
+  document.getElementById("account_id_spinner").hidden = true;
+  let account_id = agent.icrc_account_id();
+  if (account_id != last_account_id) {
+    last_account_id = account_id;
+    document.getElementById("account_id").value = account_id;
+    let typeNumber = 0;
+    let errorCorrectionLevel = "L";
+    let qr = qrcode(typeNumber, errorCorrectionLevel);
+    qr.addData(account_id.toUpperCase(), "Alphanumeric");
+    qr.make();
+    let node = document.getElementById("account_qrcode");
+    let img = document.createElement("div");
+    img.innerHTML = qr.createImgTag(3, 3);
+    node.replaceChild(img, node.children[0]);
+  }
+}
+
+function show_account_or_icrc1_id() {
+  let account_id_switch = document.getElementById("account_id_switch");
+  if (account_id_switch.innerText == "ICP Account") {
+    show_account_id();
+  } else {
+    show_icrc1_account();
+  }
+}
+
 function hide_account() {
   document.getElementById("account_id_copier").hidden = true;
   document.getElementById("account_id_spinner").hidden = false;
   document.getElementById("account_id").value = "";
-  document.getElementById("icp_balance").value = "";
+  document.getElementById("ledger_balance").value = "";
   document.getElementById("cycle_balance").value = "";
   let qr_div = document.getElementById("account_qrcode").children;
   if (qr_div.length > 0 && qr_div[0].attr && ar_div[0].attr("src")) {
@@ -91,9 +120,14 @@ function hide_account() {
 }
 
 function show_account_balance(info) {
-  document.getElementById("icp_balance").value = formatICP(
-    info.balance.icp.e8s
-  );
+  let icp_balance =
+    formatICP(info.balance.icp.e8s) + (info.balance.icp.e8s ? " ICP" : "");
+  let tcycles_balance =
+    formatCycle(info.balance.tcycles) +
+    (info.balance.tcycles ? " TCycles" : "");
+  document.getElementById("ledger_balance").value = info.balance.tcycles
+    ? tcycles_balance
+    : icp_balance;
   let spinner = document.getElementById("cycle_balance_spinner");
   let error = document.getElementById("banner_error");
   document.getElementById("cycle_balance").value =
@@ -147,7 +181,7 @@ function canister_summary(allocation) {
       if (hourly > 0) {
         let days = canister.total_allocation / hourly / 24n;
         estimation = `, estimated to last for another ${Number(
-          days
+          days,
         )} days.</p>`;
       }
     }
@@ -162,16 +196,16 @@ function canister_summary(allocation) {
     let since =
       days == 0 ? "" : ` since ${days} day` + (days == 1 ? "" : "s") + " ago";
     donations = `You have donated ${formatCycle(
-      allocation.donated
+      allocation.donated,
     )}T, about ${percent}% of the total contribution it has received${since}.`;
   }
   return [
     `<p class="grayedout">This canister had ${formatCycle(
-      canister.last_checked_balance
+      canister.last_checked_balance,
     )}T cycles, last checked on ${toUTC(canister.last_checked)}.`,
     donations,
     `Currently it has a total allocation of ${formatCycle(
-      canister.total_allocation
+      canister.total_allocation,
     )}T from all donors` + estimation,
   ].join("<br/>");
 }
@@ -180,7 +214,7 @@ function canister_row(allocation) {
   let id = allocation.canister.id.toString();
   return [
     `<td><a id='anchor_${id}'>${formatAlias(
-      allocation
+      allocation,
     )}<span class="max"><i class="far fa-edit"></i></span></a></td>`,
     `<td class='right'>${formatCycle(allocation.allocated)}T</td>`,
     `<td class='right'>${formatCycle(allocation.donated)}T</td>`,
@@ -237,11 +271,11 @@ async function save_canister(tr, id, allocation) {
       if ("UserDoesNotExist" in err) {
       } else if ("CanisterStatusError" in err) {
         error_p.innerHTML = explain_canister_status_error(
-          err.CanisterStatusError
+          err.CanisterStatusError,
         );
       } else if ("InsufficientBalance" in err) {
         error_p.innerText = `You only have a balance of ${formatCycle(
-          err.InsufficientBalance
+          err.InsufficientBalance,
         )}T, not enough to make this allocation.`;
         document.getElementById(`allocated_${id}`).focus();
       } else if ("AliasTooShort" in err) {
@@ -274,7 +308,7 @@ function show_canister(tr, allocation, autofocus = false) {
     "<div class='center'><div class='table-inner'>",
     `<label class='input-label' for='alias_${id}'><b>Alias</b></label><div class="input-box-wrapper"><div id="alias_${id}_spinner" hidden><i class="fas fa-spinner fa-spin"></i></div><input autocomplete="off" id='alias_${id}' value='${allocation.alias}' /></div><br>`,
     `<label class='input-label' for='allocated_${id}'><b>Allocated</b></label><div class="input-box-wrapper"><div id="allocated_${id}_spinner" hidden><i class="fas fa-spinner fa-spin"></i></div><input autocomplete="off" id='allocated_${id}' value='${formatCycle(
-      allocation.allocated
+      allocation.allocated,
     )}T' /></div><br>`,
     canister_summary(allocation),
     `<p class='error' id='save_canister_error_${id}'></p><div class='center'>`,
@@ -381,7 +415,7 @@ function update_user_info(info) {
 }
 
 function clear_user_info() {
-  document.getElementById("icp_balance").value = "";
+  document.getElementById("ledger_balance").value = "";
   document.getElementById("cycle_balance").value = "";
   console.log("clear_user_info");
   show_canisters([]);
@@ -403,10 +437,16 @@ async function refresh() {
 
 async function ping() {
   try {
-    let balance = await agent.ledger_account_balance();
+    let icp_balance = await agent.icp_ledger_account_balance();
+    let cycles_balance = await agent.cycles_ledger_account_balance();
     let user_info = agent.get_user_info();
-    if (user_info && balance.e8s != user_info.balance.icp.e8s) {
-      user_info.balance.icp.e8s = balance.e8s;
+    if (
+      user_info &&
+      (icp_balance.e8s != user_info.balance.icp.e8s ||
+        cycles_balance != user_info.balance.tcycles)
+    ) {
+      user_info.balance.icp.e8s = icp_balance.e8s;
+      user_info.balance.tcycles = cycles_balance;
       show_account_balance(user_info);
       agent.tipjar_ping().catch((err) => {
         console.log(err);
@@ -445,7 +485,7 @@ async function add_canister(evt) {
   error_p.innerText = "";
   try {
     canister_id = Principal.fromText(
-      document.getElementById("new_canister_id").value.trim()
+      document.getElementById("new_canister_id").value.trim(),
     );
   } catch (err) {
     console.log(err);
@@ -483,7 +523,7 @@ async function add_canister(evt) {
           "You need to send in some ICPs first before adding a canister.";
       } else if ("CanisterStatusError" in err) {
         error_p.innerHTML = explain_canister_status_error(
-          err.CanisterStatusError
+          err.CanisterStatusError,
         );
       } else {
         error_p.innerText = "Unknown error. Please try again later.";
@@ -503,6 +543,15 @@ var refresh_interval;
 var ping_interval;
 function update_login_status() {
   document.getElementById("add_canister_msg").innerText = "";
+  let account_id_switch = document.getElementById("account_id_switch");
+  account_id_switch.onclick = () => {
+    if (account_id_switch.innerText == "ICP Account") {
+      account_id_switch.innerText = "ICRC Account";
+    } else {
+      account_id_switch.innerText = "ICP Account";
+    }
+    show_account_or_icrc1_id();
+  };
   let logout_spinner = document.getElementById("logout_spinner");
   let logout_btn = document.getElementById("logout_button");
   logout_btn.onclick = async () => {
@@ -512,6 +561,16 @@ function update_login_status() {
     logout_spinner.hidden = true;
     update_login_status();
     document.getElementById("banner_error").innerText = "You have logged out.";
+  };
+  let buy_tcycles = document.getElementById("buy_tcycles");
+  buy_tcycles.onclick = () => {
+    if (agent.is_anonymous()) {
+      document.getElementById("banner_error").innerText =
+        "Please login first or use a temporary account.";
+    } else {
+      let account_id = agent.icrc_account_id();
+      window.open(`https://cycle.express/?to=${account_id}`);
+    }
   };
   if (agent.is_authenticated()) {
     document.getElementById("login_box").hidden = true;
@@ -542,7 +601,7 @@ function update_login_status() {
     document.getElementById("temporary_account").onclick = start_temporary;
     document.getElementById("banner_error").innerText = "";
   }
-  show_account_id();
+  show_account_or_icrc1_id();
   refresh();
   /// refresh every 5s
   if (!refresh_interval) {
@@ -565,7 +624,6 @@ async function start_ii_login() {
     await refresh();
     login_spinner.hidden = true;
     login_btn.disabled = false;
-    show_account_id();
     if (!agent.is_authenticated()) {
       document.getElementById("banner_error").innerText =
         "Internet Identity login failed. Please try again later.";

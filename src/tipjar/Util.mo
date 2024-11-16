@@ -24,11 +24,11 @@ module Util {
   public type Queue<T> = Queue.Queue<T>;
   public type Cycle = Nat;
 
-  public type Token = { e8s: Nat64 };
+  public type ICP = { e8s: Nat64 };
 
   public type Balance = { icp: { var e8s: Nat64 }; var cycle: Cycle };
 
-  public type BalanceInfo = { icp: Token; cycle: Cycle };
+  public type BalanceInfo = { icp: ICP; cycle: Cycle };
 
   public type Allocation = {
     canister: Canister;
@@ -240,7 +240,7 @@ module Util {
   };
 
   // Set the ICP balance of a user (and last_updated if the balance has changed).
-  public func setUserICP(user: User, icp: Token) : Bool {
+  public func setUserICP(user: User, icp: ICP) : Bool {
     if (icp.e8s != user.balance.icp.e8s) {
       user.balance.icp.e8s := icp.e8s;
       user.last_updated := Time.now();

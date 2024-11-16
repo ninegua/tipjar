@@ -12,7 +12,18 @@
         }
       }
     },
-    "ledger": {
+    "cycles_ledger": {
+      "type": "custom",
+      "candid": "src/cycles_ledger/cycles-ledger.did",
+      "wasm": "src/cycles_ledger/cycles-ledger.wasm.gz",
+      "remote": {
+        "candid": "src/cycles_ledger/cycles-ledger.did",
+        "id": {
+          "ic": "um5iw-rqaaa-aaaaq-qaaba-cai"
+        }
+      }
+    },
+     "ledger": {
       "type": "custom",
       "wasm": "",
       "candid": "src/ledger/ledger.did",

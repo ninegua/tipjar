@@ -14,7 +14,8 @@ import Time "mo:base/Time";
 import TrieSet "mo:base/TrieSet";
 
 import CMC "canister:cmc";
-import Ledger "canister:ledger";
+import ICPLedger "canister:ledger";
+import CyclesLedger "canister:cycles_ledger";
 import Logger "canister:logger";
 import Blackhole "canister:blackhole";
 
@@ -27,10 +28,16 @@ shared (installation) actor class TipJar() = self {
   let OWNER = installation.caller;
 
   // ICP fees (TODO: this ideally should come from the ledger instead of being hard coded).
-  let FEE = 10000 : Nat64;
+  let ICP_FEE = 10000 : Nat64;
+
+  // TCycles fees (TODO: this ideally should come from the ledger instead of being hard coded).
+  let TCYCLES_FEE = 100_000_000 : Cycle;
 
   // Minimum ICP deposit required before converting to cycles.
-  let MIN_DEPOSIT = FEE * 10;
+  let ICP_MIN_DEPOSIT = ICP_FEE * 10;
+
+  // Minimum TCycles deposit required before converting to cycles.
+  let TCYCLES_MIN_DEPOSIT = TCYCLES_FEE * 10;
 
   // The current method of converting ICP to cycles is by sending ICP to the
   // cycle minting canister with a memo.
@@ -59,7 +66,7 @@ shared (installation) actor class TipJar() = self {
   type Balance = Util.Balance;
   type User = Util.User;
   type Canister = Util.Canister;
-  type Token = Util.Token;
+  type ICP = Util.ICP;
   type Cycle = Util.Cycle;
   type Queue<T> = Queue.Queue<T>;
   type Result<O, E> = Result.Result<O, E>;
@@ -175,11 +182,6 @@ shared (installation) actor class TipJar() = self {
     #NoCyclesToDeposit;
   };
 
-  type DepositCycles = {
-    #User: Principal;
-    #Account: Text;
-  };
-
   // Deposit available cycles to the given user's cycle account.
   public shared func depositCyclesFor(id: Principal) : async Result<Cycle, DepositCyclesError> {
     let amount = Cycles.available();
@@ -203,10 +205,10 @@ shared (installation) actor class TipJar() = self {
   };
 
   // Test function that directly calls ledger's notify. Used by admin for debugging only.
-  public shared (arg) func testNotify(id: Principal, icp: Token, height: Ledger.BlockIndex) {
+  public shared (arg) func testNotify(id: Principal, icp: ICP, height: ICPLedger.BlockIndex) {
     assert(arg.caller == OWNER);
     let user = Option.unwrap(findUser(id));
-    let deposit : Deposit = { user = user; icp = icp };
+    let deposit : DepositV2 = { user = user; token = #ICP(icp) };
     depositing := ?(deposit, #Notify(height));
   };
 
@@ -336,19 +338,23 @@ shared (installation) actor class TipJar() = self {
   // We we are in stopping mode, new deposits or topup will not be processed.
   var stopping = false;
 
-  type Deposit = { user: User; icp: Token; };
+  type DepositToken = { #ICP: ICP; #TCYCLES: Cycle };
+
+  type Deposit = { user: User; icp: ICP; };
+  type DepositV2 = { user: User; token: DepositToken; };
 
   // Deposit queue. Require users to ping to be added to this queue.
   stable var deposits : Queue<Deposit> = Queue.empty();
+  stable var deposits_v2 : Queue<DepositV2> = Queue.empty();
 
   type Stage = {
     #Mint;
     #MintCalled;
-    #Notify: Ledger.BlockIndex;
+    #Notify: ICPLedger.BlockIndex;
     #NotifyCalled;
   };
 
-  type Depositing = (Deposit, Stage);
+  type Depositing = (DepositV2, Stage);
 
   // Current deposit in progress.
   var depositing : ?Depositing = null;
@@ -375,22 +381,42 @@ shared (installation) actor class TipJar() = self {
     // Disallow anonymous user.
     assert(not Principal.isAnonymous(id));
 
+    let owner = Principal.fromActor(self);
     let subaccount = Util.principalToSubAccount(id);
-    let account = Blob.fromArray(AccountId.fromPrincipal(Principal.fromActor(self), ?subaccount));
+    let account = Blob.fromArray(AccountId.fromPrincipal(owner, ?subaccount));
     try {
-      let icp = await Ledger.account_balance({ account = account });
-      if (icp.e8s >= MIN_DEPOSIT and
-          Option.isNull(Queue.find<Deposit>(deposits, func(x) { x.user.id == id })) and
+      let cycles = await CyclesLedger.icrc1_balance_of({ owner = owner; subaccount = ?Blob.fromArray(subaccount) });
+      if (cycles >= TCYCLES_MIN_DEPOSIT and
+          Option.isNull(Queue.find<DepositV2>(deposits_v2, func(x) { x.user.id == id })) and
           not (Option.getMapped(depositingInfo(), Util.eqId(id), false))) {
         let user = findOrCreateNewUser(id);
-        ignore log("AccountBalance " # debug_show({
+        ignore log("TCYCLES Balance " # debug_show({
+          user = id;
+          tcycles = cycles;
+          delegate = Option.isSome(user.delegate);
+          }));
+        Util.setUserStatus(user, ?#DepositingCycle);
+        ignore Queue.pushBack(deposits_v2, { user = user; token = #TCYCLES(cycles) });
+        // TODO: trigger poll
+        return;
+      }
+    } catch (err) {
+      ignore log("TCycles Balance " # debug_show ({ user = id; err = show_error(err) }))
+    };
+    try {
+      let icp = await ICPLedger.account_balance({ account = account });
+      if (icp.e8s >= ICP_MIN_DEPOSIT and
+          Option.isNull(Queue.find<DepositV2>(deposits_v2, func(x) { x.user.id == id })) and
+          not (Option.getMapped(depositingInfo(), Util.eqId(id), false))) {
+        let user = findOrCreateNewUser(id);
+        ignore log("ICP Balance " # debug_show({
           user = id;
           icp = { old = user.balance.icp; new = icp };
           delegate = Option.isSome(user.delegate);
           }));
         ignore Util.setUserICP(user, icp);
         Util.setUserStatus(user, ?#DepositingCycle);
-        ignore Queue.pushBack(deposits, { user = user; icp = icp });
+        ignore Queue.pushBack(deposits_v2, { user = user; token = #ICP(icp) });
         // TODO: trigger poll
         return;
       };
@@ -398,7 +424,7 @@ shared (installation) actor class TipJar() = self {
         case null ();
         case (?user) {
           if (Util.setUserICP(user, icp)) {
-            ignore log("AccountBalance " # debug_show({
+            ignore log("ICP Balance " # debug_show({
               user = id;
               icp = { old = user.balance.icp; new = icp };
               delegate = Option.isSome(user.delegate);
@@ -407,7 +433,7 @@ shared (installation) actor class TipJar() = self {
         }
       }
     } catch(err) {
-      ignore log("AccountBalance " # debug_show ({ user = id; err = show_error(err) }))
+      ignore log("ICP Balance " # debug_show ({ user = id; err = show_error(err) }))
     }
   };
 
@@ -419,7 +445,7 @@ shared (installation) actor class TipJar() = self {
 
     // Only start working on the next deposit if we are not stopping.
     if (Option.isNull(depositing) and not stopping) {
-      switch (Queue.popFront(deposits)) {
+      switch (Queue.popFront(deposits_v2)) {
         case null return;
         case (?deposit) {
           // We must TRAP if there is a topup in progress to avoid changing deposit queue.
@@ -435,25 +461,54 @@ shared (installation) actor class TipJar() = self {
         let from_subaccount = Util.principalToSubAccount(user.id);
         let to_subaccount = Util.principalToSubAccount(Principal.fromActor(self));
         let account = AccountId.fromPrincipal(CYCLE_MINTING_CANISTER, ?to_subaccount);
-        ignore log("BeforeTransfer " # debug_show({ user = user.id; deposit = deposit.icp }));
+        ignore log("BeforeTransfer " # debug_show({ user = user.id; deposit = deposit.token }));
         try {
           depositing := ?(deposit, #MintCalled);
-          let result = await Ledger.transfer({
-                to = Blob.fromArray(account);
-                fee = { e8s = FEE };
-                memo = TOP_UP_CANISTER_MEMO;
-                from_subaccount = ?Blob.fromArray(from_subaccount);
-                amount = { e8s = deposit.icp.e8s - FEE };
-                created_at_time = null;
-              });
-          ignore log("AfterTransfer " # debug_show({ result = result; }));
-          switch (result) {
-            case (#Ok(block_height)) {
-              depositing := ?(deposit, #Notify(block_height));
+          switch (deposit.token) {
+            case (#ICP(icp)) {
+              let result = await ICPLedger.transfer({
+                    to = Blob.fromArray(account);
+                    fee = { e8s = ICP_FEE };
+                    memo = TOP_UP_CANISTER_MEMO;
+                    from_subaccount = ?Blob.fromArray(from_subaccount);
+                    amount = { e8s = icp.e8s - ICP_FEE };
+                    created_at_time = null;
+                  });
+              ignore log("AfterTransfer " # debug_show({ result = result; }));
+              switch (result) {
+                case (#Ok(block_height)) {
+                  depositing := ?(deposit, #Notify(block_height));
+                };
+                case (#Err(err)) {
+                  depositing := null;
+                  Util.setUserStatus(user, ?#DepositError(debug_show(err)));
+                }
+              }
             };
-            case (#Err(err)) {
+            case (#TCYCLES(cycles)) {
+              let result = await CyclesLedger.withdraw({
+                    to = Principal.fromActor(self);
+                    from_subaccount = ?Blob.fromArray(from_subaccount);
+                    amount = cycles - TCYCLES_FEE;
+                    created_at_time = null;
+                  });
+              ignore log("AfterWithdraw " # debug_show({ result = result; }));
+              switch result {
+                case (#Err(err)) {
+                  Util.setUserStatus(user, ?#DepositError(debug_show(err)));
+                };
+                case (#Ok(_)) {
+                  tipjar.funded := tipjar.funded + cycles;
+                  let beneficiary = Option.get(Option.chain(user.delegate, findUser), user);
+                  let old_cycle = beneficiary.balance.cycle;
+                  ignore Util.setUserCycle(beneficiary, beneficiary.balance.cycle + cycles);
+                  ignore log("TopUpCycle " # debug_show({
+                    user = beneficiary.id; delegate = beneficiary.id != user.id;
+                    old = old_cycle; new = beneficiary.balance.cycle; }));
+                  Util.setUserStatus(user, ?#DepositSuccess);
+                }
+              };
               depositing := null;
-              Util.setUserStatus(user, ?#DepositError(debug_show(err)));
             }
           }
         } catch(err) {
@@ -461,13 +516,13 @@ shared (installation) actor class TipJar() = self {
           ignore log("AfterTransfer " # show_error(err));
           depositing := null;
           Util.setUserStatus(user, ?#DepositError(Error.message(err)));
-        }
+        };
       };
       case (?(deposit, #Notify(block_height))) {
         let user = deposit.user;
         let starting_cycles = Cycles.balance();
         ignore log("BeforeNotify " #
-          debug_show({ user = user.id; deposit = deposit.icp; starting_cycles = starting_cycles; }));
+          debug_show({ user = user.id; deposit = deposit.token; starting_cycles = starting_cycles; }));
         try {
           depositing := ?(deposit, #NotifyCalled);
           let result = await CMC.notify_top_up({
@@ -645,11 +700,11 @@ shared (installation) actor class TipJar() = self {
   //////////////////////////////////////////////////////////////////////////
 
   type Stats = { donors: Nat; canisters: Nat; funded: Nat; allocated: Nat; donated: Nat; info: Text };
-  type DepositingInfo = { id: Principal; icp: Token; stage: Stage };
+  type DepositingInfo = { id: Principal; token: DepositToken; stage: Stage };
 
   func depositingInfo() : ?DepositingInfo {
     Option.map(depositing, func(d: Depositing) : DepositingInfo {
-      { id = d.0.user.id; icp = d.0.icp; stage = d.1 }
+      { id = d.0.user.id; token = d.0.token; stage = d.1 }
     })
   };
 
@@ -662,7 +717,7 @@ shared (installation) actor class TipJar() = self {
               timer_in_progress = timer_in_progress;
               depositing = depositingInfo();
               topping_up = Option.map(topping_up, func(c: Canister) : Principal { c.id });
-              pending_deposit = Queue.size(deposits);
+              pending_deposit = Queue.size(deposits_v2);
               pending_topup = Queue.size(topup_queue);
               balance = selfBalance();
               canisters = Array.map(Queue.toArray(all_canisters()),
@@ -690,4 +745,10 @@ shared (installation) actor class TipJar() = self {
     Array.map(Queue.toArray(all_canisters()), Util.canisterInfo)
   };
 
+  system func postupgrade() {
+    for (x in Queue.toIter(deposits)) {
+      ignore Queue.pushBack(deposits_v2, { user = x.user; token = #ICP(x.icp) })
+    };
+    deposits := Queue.empty();
+  }
 }

@@ -2,11 +2,16 @@ import { Ed25519KeyIdentity } from "@dfinity/identity";
 import { Actor, HttpAgent, AnonymousIdentity } from "@dfinity/agent";
 import { Principal } from "@dfinity/principal";
 import { AuthClient } from "@dfinity/auth-client";
+import { encodeIcrcAccount } from "@dfinity/ledger-icrc";
 import pemfile from "pem-file";
 
 import {
-  idlFactory as ledger_idl,
-  canisterId as ledger_id,
+  idlFactory as cycles_ledger_idl,
+  canisterId as cycles_ledger_id,
+} from "../../declarations/cycles_ledger";
+import {
+  idlFactory as icp_ledger_idl,
+  canisterId as icp_ledger_id,
 } from "../../declarations/ledger";
 import {
   idlFactory as tipjar_idl,
@@ -19,7 +24,7 @@ function saveLocalIdentity(local) {
   let identity = JSON.stringify(local.identity);
   localStorage.setItem(
     "local_identity",
-    JSON.stringify({ identity, type: local.type })
+    JSON.stringify({ identity, type: local.type }),
   );
 }
 
@@ -85,18 +90,43 @@ function principalToSubAccount(principal) {
 
 function createState(identity, authenticated) {
   let principal = identity.getPrincipal();
-  console.log(principal.toString());
-  let account = principalToAccountId(
+  let subaccount = principalToSubAccount(principal);
+  console.log("caller principal", principal.toString());
+  console.log("caller subaccount", Buffer.from(subaccount).toString("hex"));
+  let account_id = principalToAccountId(
     Principal.fromText(tipjar_id),
-    principalToSubAccount(principal)
+    subaccount,
   );
-  return { identity, principal, account, authenticated, users: {} };
+  let icrc_account = {
+    owner: Principal.fromText(tipjar_id),
+    subaccount: [subaccount],
+  };
+  let icrc_account_id = encodeIcrcAccount({
+    owner: icrc_account.owner,
+    subaccount: icrc_account.subaccount[0],
+  });
+  return {
+    identity,
+    principal,
+    account_id,
+    icrc_account,
+    icrc_account_id,
+    authenticated,
+    users: {},
+  };
 }
 
 function createActors(agent) {
   return {
     tipjar: Actor.createActor(tipjar_idl, { agent, canisterId: tipjar_id }),
-    ledger: Actor.createActor(ledger_idl, { agent, canisterId: ledger_id }),
+    icp_ledger: Actor.createActor(icp_ledger_idl, {
+      agent,
+      canisterId: icp_ledger_id,
+    }),
+    cycles_ledger: Actor.createActor(cycles_ledger_idl, {
+      agent,
+      canisterId: cycles_ledger_id,
+    }),
   };
 }
 
@@ -131,7 +161,7 @@ export async function decodeIdentity(pem) {
 export class Agent {
   constructor(auth_client_callback) {
     this.auth_client_callback = auth_client_callback;
-    AuthClient.create()
+    AuthClient.create({ idleOptions: { disableDefaultIdleCallback: true } })
       .then((client) => {
         this.try_activate_auth_client(client);
       })
@@ -146,6 +176,12 @@ export class Agent {
 
   set_user_info(info) {
     if (this.state.principal) {
+      if (info && this.state.users[this.state.principal]) {
+        // Ignore info.balance.icp, only keep info.balance.cycles
+        let balance = this.state.users[this.state.principal].balance;
+        balance.cycle = info.balance.cycle;
+        info.balance = balance;
+      }
       this.state.users[this.state.principal] = info;
     }
   }
@@ -259,7 +295,15 @@ export class Agent {
   }
 
   account_id_hex() {
-    return Buffer.from(this.state.account).toString("hex");
+    return Buffer.from(this.state.account_id).toString("hex");
+  }
+
+  icrc_account() {
+    return this.state.icrc_account;
+  }
+
+  icrc_account_id() {
+    return this.state.icrc_account_id;
   }
 
   tipjar_stats() {
@@ -282,8 +326,14 @@ export class Agent {
     return this.actors.tipjar.allocate(x);
   }
 
-  ledger_account_balance() {
-    return this.actors.ledger.account_balance({ account: this.state.account });
+  icp_ledger_account_balance() {
+    return this.actors.icp_ledger.account_balance({
+      account: this.state.account_id,
+    });
+  }
+
+  cycles_ledger_account_balance() {
+    return this.actors.cycles_ledger.icrc1_balance_of(this.state.icrc_account);
   }
 
   async ii_login(login_callback) {
