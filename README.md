@@ -57,12 +57,12 @@ make deploy
 This will start a dfx replica, download necessary files, and deploy all canisters locally.
 
 
-[cycles]: https://smartcontracts.org/docs/developers-guide/concepts/tokens-cycles.html
+[cycles]: https://internetcomputer.org/docs/current/developer-docs/getting-started/cycles/overview
 [black hole]: https://github.com/ninegua/ic-blackhole
-[canisters]: https://sdk.dfinity.org/docs/developers-guide/concepts/canisters-code.html
+[canisters]: https://internetcomputer.org/how-it-works/canister-lifecycle/
 [Internet Computer]: https://dashboard.internetcomputer.org
 [GNU make]: https://www.gnu.org/software/make
 [curl]: https://curl.se
-[dfx]: https://smartcontracts.org/docs/quickstart/1-quickstart.html
+[dfx]: https://internetcomputer.org/docs/current/developer-docs/developer-tools/dev-tools-overview/#dfx
 [vessel]: https://github.com/dfinity/vessel
 [nix]: https://nixos.org/download.html#download-nix
