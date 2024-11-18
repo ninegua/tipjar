@@ -14,6 +14,7 @@ Donate [cycles] to your favorite [canisters] on the [Internet Computer] and keep
 - [x] Support Internet Identity login.
 - [x] Support "add to home screen" on mobile browsers.
 - [x] Support import of PEM file for those who do not have or use Internet Identity.
+- [x] Support deposit using TCycles token.
 - [ ] Blacklist canisters that attempt to rug pull.
 - [ ] [Canister list pagination and search box](https://github.com/ninegua/tipjar/issues/3).
 - [ ] [Allow canister controllers to authorize their own donation page](https://github.com/ninegua/tipjar/issues/2).
@@ -29,29 +30,19 @@ I also wrote down [some random notes](NOTES.md) on the design decisions in makin
 **Releases**
 
 - Version 0.0.0 (retired)
+  - A technical demo that shows ICPs can be automatically converted into Cycles.
 
-  A technical demo that shows ICPs can be automatically converted into Cycles.
+- Version 0.0.1 (retired)
+  - There could still be bugs to iron out over time, please [report issues on GitHub](https://github.com/ninegua/tipjar/issues).
+  - Open source.
 
-- Version 0.0.1 (live)
+- Version 0.1.0 (live)
+  - Ready when existing features are sufficiently tested.
 
-  There could still be bugs to iron out over time, please [report issues on GitHub](https://github.com/ninegua/tipjar/issues).
-  Source code is already released.
-
-- Version 0.1.0
- 
-  Ready when existing features are sufficiently tested.
-
-- Version 0.2.0
-
-  Complete features for both donors and canister developers.
-
-- Version 0.3.0
-
-  Feature freeze. Only bug fixes will be implemented.
-
-- Version 0.4.0
-
-  The day when TipJar becomes immutable by having the [black hole] as its only controller!
+- Version 0.2.0 and beyond (todo)
+  - Complete features for both donors and canister developers.
+  - Feature freeze. Only bug fixes will be implemented.
+  - The day when TipJar becomes immutable by having the [black hole] as its only controller!
 
 **Local deployment**
 
