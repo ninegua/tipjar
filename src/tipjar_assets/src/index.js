@@ -164,6 +164,29 @@ function toDays(period) {
   return Number(period / 1000000000n / 3600n / 24n);
 }
 
+function calculateEstimatedDays(allocation) {
+  let canister = allocation.canister;
+  if (canister.usage.length <= 3) {
+    return "N/A";
+  }
+  
+  var usage = 0n;
+  var period = 0n;
+  for (var i = 0; i < canister.usage.length; i++) {
+    usage += canister.usage[i].cycle;
+    period += canister.usage[i].period;
+  }
+  period = period / 3600000000000n;
+  if (period > 0) {
+    let hourly = usage / period;
+    if (hourly > 0) {
+      let days = canister.total_allocation / hourly / 24n;
+      return Number(days);
+    }
+  }
+  return "N/A";
+}
+
 function canister_summary(allocation) {
   let canister = allocation.canister;
   console.log(canister);
@@ -212,12 +235,28 @@ function canister_summary(allocation) {
 
 function canister_row(allocation) {
   let id = allocation.canister.id.toString();
+  let estimatedDays = calculateEstimatedDays(allocation);
+  let expirationText;
+  
+  if (estimatedDays === "N/A") {
+    expirationText = "N/A";
+  } else {
+    let expirationDate = new Date();
+    expirationDate.setDate(expirationDate.getDate() + estimatedDays);
+    expirationText = expirationDate.toLocaleDateString('en-US', { 
+      month: 'short', 
+      day: 'numeric', 
+      year: 'numeric' 
+    });
+  }
+  
   return [
     `<td><a id='anchor_${id}'>${formatAlias(
       allocation,
     )}<span class="max"><i class="far fa-edit"></i></span></a></td>`,
     `<td class='right'>${formatCycle(allocation.allocated)}T</td>`,
     `<td class='right'>${formatCycle(allocation.donated)}T</td>`,
+    `<td class='right'>${expirationText}</td>`,
   ].join("");
 }
 
@@ -304,7 +343,7 @@ async function save_canister(tr, id, allocation) {
 function show_canister(tr, allocation, autofocus = false) {
   let id = allocation.canister.id;
   tr.innerHTML = [
-    `<td colspan='3'><a>${formatAlias(allocation)}</a><br>`,
+    `<td colspan='4'><a>${formatAlias(allocation)}</a><br>`,
     "<div class='center'><div class='table-inner'>",
     `<label class='input-label' for='alias_${id}'><b>Alias</b></label><div class="input-box-wrapper"><div id="alias_${id}_spinner" hidden><i class="fas fa-spinner fa-spin"></i></div><input autocomplete="off" id='alias_${id}' value='${allocation.alias}' /></div><br>`,
     `<label class='input-label' for='allocated_${id}'><b>Allocated</b></label><div class="input-box-wrapper"><div id="allocated_${id}_spinner" hidden><i class="fas fa-spinner fa-spin"></i></div><input autocomplete="off" id='allocated_${id}' value='${formatCycle(
