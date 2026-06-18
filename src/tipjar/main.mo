@@ -22,42 +22,42 @@ import Blackhole "canister:blackhole";
 import Queue "mo:mutable-queue/Queue";
 import Util "./Util";
 
-shared (installation) actor class TipJar() = self {
+shared (installation) persistent actor class TipJar() = self {
 
   // Some administrative functions are only accessible by who created this canister.
-  let OWNER = installation.caller;
+  transient let OWNER = installation.caller;
 
   // ICP fees (TODO: this ideally should come from the ledger instead of being hard coded).
-  let ICP_FEE = 10000 : Nat64;
+  transient let ICP_FEE = 10000 : Nat64;
 
   // TCycles fees (TODO: this ideally should come from the ledger instead of being hard coded).
-  let TCYCLES_FEE = 100_000_000 : Cycle;
+  transient let TCYCLES_FEE = 100_000_000 : Cycle;
 
   // Minimum ICP deposit required before converting to cycles.
-  let ICP_MIN_DEPOSIT = ICP_FEE * 10;
+  transient let ICP_MIN_DEPOSIT = ICP_FEE * 10;
 
   // Minimum TCycles deposit required before converting to cycles.
-  let TCYCLES_MIN_DEPOSIT = TCYCLES_FEE * 10;
+  transient let TCYCLES_MIN_DEPOSIT = TCYCLES_FEE * 10;
 
   // The current method of converting ICP to cycles is by sending ICP to the
   // cycle minting canister with a memo.
-  let CYCLE_MINTING_CANISTER = Principal.fromText("rkp4c-7iaaa-aaaaa-aaaca-cai");
-  let TOP_UP_CANISTER_MEMO = 0x50555054 : Nat64;
+  transient let CYCLE_MINTING_CANISTER = Principal.fromText("rkp4c-7iaaa-aaaaa-aaaca-cai");
+  transient let TOP_UP_CANISTER_MEMO = 0x50555054 : Nat64;
 
   // Wait for CHECK_INTERVAL before checking a canister's cycle balance again (8 hours).
-  let CHECK_INTERVAL = 3600 * 8_000_000_000;
+  transient let CHECK_INTERVAL = 3600 * 8_000_000_000;
 
   // Period to call the poll function when there are pending deposits (every 5 seconds).
-  let POLLING_PERIOD = 5 * 1_000_000_000;
+  transient let POLLING_PERIOD = 5 * 1_000_000_000;
 
   // The minimum gap (from the average) required before we topup a canister.
-  let MIN_CYCLE_GAP = 100_000_000_000;
+  transient let MIN_CYCLE_GAP = 100_000_000_000;
 
   // The minimum cycle balance for the TipJar canister to keep working.
-  let MIN_RESERVE = 1_000_000_000_000;
+  transient let MIN_RESERVE = 1_000_000_000_000;
 
   // The maximum number of canisters per user account.
-  let MAX_CANISTERS_PER_USER = 200;
+  transient let MAX_CANISTERS_PER_USER = 200;
 
   // Interface of the IC00 management canister. At the moment we only need
   // 'deposit_cycles' to unconditionally send cycles to another canister.
@@ -336,7 +336,7 @@ shared (installation) actor class TipJar() = self {
   //////////////////////////////////////////////////////////////////////////
 
   // We we are in stopping mode, new deposits or topup will not be processed.
-  var stopping = false;
+  transient var stopping = false;
 
   type DepositToken = { #ICP: ICP; #TCYCLES: Cycle };
 
@@ -357,7 +357,7 @@ shared (installation) actor class TipJar() = self {
   type Depositing = (DepositV2, Stage);
 
   // Current deposit in progress.
-  var depositing : ?Depositing = null;
+  transient var depositing : ?Depositing = null;
 
   // Stop future system activities after finishing pending ones.
   public shared (arg) func stop(val: Bool) {
@@ -564,10 +564,10 @@ shared (installation) actor class TipJar() = self {
   };
 
   // When we are ready to topup a canister, we add it to the topup_queue.
-  var topup_queue : Queue<Canister> = Queue.empty<Canister>();
+  transient var topup_queue : Queue<Canister> = Queue.empty<Canister>();
 
   // The canister that we are currently trying to topup.
-  var topping_up : ?Canister = null;
+  transient var topping_up : ?Canister = null;
 
   // Poll the topup queue to top up the next canister.
   // Inflight topup should block user deposit, and vice versa.
@@ -672,7 +672,7 @@ shared (installation) actor class TipJar() = self {
   };
 
   // To prevent re-entry of timer function
-  var timer_in_progress = false;
+  transient var timer_in_progress = false;
 
   system func timer(setGlobalTimer : Nat64 -> ()) : async () {
     // Do nothing if we are stopping.

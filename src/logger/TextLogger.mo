@@ -7,11 +7,11 @@ import Principal "mo:base/Principal";
 
 import Logger "mo:ic-logger/Logger";
 
-actor TextLogger {
-  let OWNER = Principal.fromText("y5mgz-ye6pv-bg3mu-purwq-cowuz-gkva5-hdsrv-leuqd-53hfi-kyjr4-oae");
+persistent actor TextLogger {
+  transient let OWNER = Principal.fromText("y5mgz-ye6pv-bg3mu-purwq-cowuz-gkva5-hdsrv-leuqd-53hfi-kyjr4-oae");
 
   stable var state : Logger.State<Text> = Logger.new<Text>(0, null);
-  let logger = Logger.Logger<Text>(state);
+  transient let logger = Logger.Logger<Text>(state);
 
   // Principals that are allowed to log messages.
   stable var allowed : [Principal] = [OWNER];
