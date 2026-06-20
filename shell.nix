@@ -4,6 +4,8 @@ let
     "https://github.com/ninegua/ic-nix/releases/download/20260616/dfx-env.tar.gz")
     { };
 in dfx-env.overrideAttrs (old: {
+  # disable icp-cli telemetry
+  DO_NOT_TRACK = 1;
   nativeBuildInputs = old.nativeBuildInputs
     ++ [ pkgs.wasmtime pkgs.pandoc pkgs.nodejs pkgs.prettier ];
 })

@@ -8,15 +8,15 @@ import pemfile from "pem-file";
 import {
   idlFactory as cycles_ledger_idl,
   canisterId as cycles_ledger_id,
-} from "../../declarations/cycles_ledger";
+} from "../declarations/cycles_ledger";
 import {
   idlFactory as icp_ledger_idl,
   canisterId as icp_ledger_id,
-} from "../../declarations/ledger";
+} from "../declarations/ledger";
 import {
   idlFactory as tipjar_idl,
   canisterId as tipjar_id,
-} from "../../declarations/tipjar";
+} from "../declarations/tipjar";
 import crc32 from "crc-32";
 import { sha224 } from "@noble/hashes/sha256";
 

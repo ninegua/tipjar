@@ -1,4 +1,4 @@
-let upstream = https://github.com/dfinity/vessel-package-set/releases/download/mo-0.12.1-20240808/package-set.dhall sha256:975d4b33f3ce1fa051c73e45fab69dd187dba6b037b6d2e5568ccac26c477d4f
+let upstream = https://github.com/dfinity/vessel-package-set/releases/download/mo-0.16.2-20250915/package-set.dhall sha256:c797f429013c6869fff4bda99308ec74397e077b4655c5f2c36b484318e4b5b4
 let Package =
     { name : Text, version : Text, repo : Text, dependencies : List Text }
 
@@ -6,10 +6,10 @@ let
   -- This is where you can add your own packages to the package-set
   additions =
     [
-      { name = "accountid"
-      , repo = "https://github.com/stephenandrews/motoko-accountid"
-      , version = "06726b1625fea8870bc8c248d661b11a4ebfe7ae"
-      , dependencies = [ "base" ]
+      { name = "core"
+      , version = "v2.5.0"
+      , repo = "https://github.com/caffeinelabs/motoko-core"
+      , dependencies = [] : List Text
       },
       { name = "ic-logger"
       , repo = "https://github.com/ninegua/ic-logger"

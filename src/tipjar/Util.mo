@@ -1,4 +1,3 @@
-import AccountId "mo:accountid/AccountId";
 import Array "mo:base/Array";
 import Blob "mo:base/Blob";
 import Debug "mo:base/Debug";
@@ -104,7 +103,7 @@ module Util {
   };
 
   // Same as Option.unwrap, but without the annoying warning.
-  func unwrap<T>(x: ?T) : T {
+  public func unwrap<T>(x: ?T) : T {
     switch x {
       case null { Prelude.unreachable() };
       case (?x_) { x_ };
@@ -141,8 +140,8 @@ module Util {
   // Convert User to UserInfo. The 'self' parameter (tipjar's canister id)
   // is used to calculate account number.
   public func userInfo(self: Principal, user: User) : UserInfo {
-    let subaccount = Util.principalToSubAccount(user.id);
-    let account = toHex(AccountId.fromPrincipal(self, ?subaccount));
+    let subaccount = principalToSubAccount(user.id);
+    let account = toHex(Principal.toLedgerAccount(self, ?subaccount));
     { id = user.id;
       account = account;
       balance = balanceInfo(user.balance);
@@ -153,13 +152,13 @@ module Util {
   };
 
   // Convert principal id to subaccount id.
-  public func principalToSubAccount(id: Principal) : [Nat8] {
+  public func principalToSubAccount(id: Principal) : Blob {
     let p = Blob.toArray(Principal.toBlob(id));
-    Array.tabulate(32, func(i : Nat) : Nat8 {
+    Blob.fromArray(Array.tabulate(32, func(i : Nat) : Nat8 {
       if (i >= p.size() + 1) 0
       else if (i == 0) (Nat8.fromNat(p.size()))
       else (p[i - 1])
-    })
+    }))
   };
 
   // Set a user's delegate field. Note that this doesn't call 'transferAccount'.
@@ -344,7 +343,7 @@ module Util {
     };
     switch (findAllocation(user, canister.id)) {
       case (?alloc) {
-        var total = alloc.allocated + user.balance.cycle;
+        let total = alloc.allocated + user.balance.cycle;
         if (total >= amount) {
           ignore setUserCycle(user, total - amount);
           alloc.allocated := amount;
@@ -422,8 +421,8 @@ module Util {
 
   let hexChars = ["0","1","2","3","4","5","6","7","8","9","a","b","c","d","e","f"];
 
-  public func toHex(arr: [Nat8]): Text {
-    Text.join("", Iter.map<Nat8, Text>(Iter.fromArray(arr), func (x: Nat8) : Text {
+  public func toHex(blob: Blob): Text {
+    Text.join("", Iter.map<Nat8, Text>(blob.vals(), func (x: Nat8) : Text {
       let a = Nat8.toNat(x / 16);
       let b = Nat8.toNat(x % 16);
       hexChars[a] # hexChars[b]

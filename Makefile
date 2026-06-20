@@ -1,17 +1,17 @@
-OBJ_DIR=.dfx/ic/canisters
 DIST_DIR=./dist
 IMAGES_SRC=$(wildcard src/tipjar_assets/assets/*.png) $(wildcard src/tipjar_assets/assets/*/*/*.png) $(wildcard src/tipjar_assets/assets/*.ico)
 ASSETS_SRC=$(wildcard src/tipjar_assets/src/*.html) $(wildcard src/tipjar_assets/src/*.js) src/tipjar_assets/assets/tipjar.webmanifest src/tipjar_assets/assets/faq.html
-MOTOKO_SRC=$(wildcard src/tipjar/*.mo) 
-SRC=$(MOTOKO_SRC) $(ASSETS_SRC) $(IMAGES_SRC)
+TIPJAR_SRC=$(wildcard src/tipjar/*.mo)
+LOGGER_SRC=$(wildcard src/logger/*.mo)
 IC_VERSION=a17247bd86c7aa4e87742bf74d108614580f216d
 
-deploy: download
-	dfx deploy
+build: dist/tipjar.wasm dist/logger.wasm
 
 download: src/blackhole/blackhole.did src/blackhole/blackhole-opt.wasm \
-	src/ledger/ledger.did src/cmc/cmc.did \
-	src/cycles_ledger/cycles-ledger.did src/cycles_ledger/cycles-ledger.wasm.gz
+	src/ledger/ledger.did src/cmc/cmc.did src/cycles_ledger/cycles-ledger.did
+
+src/blackhole/blackhole.did.mo: src/blackhole/blackhole.did
+	didc bind --target mo $< > $@
 
 src/blackhole/blackhole.did:
 	curl -Lo $@ https://github.com/ninegua/ic-blackhole/releases/download/0.0.0/blackhole.did
@@ -23,27 +23,24 @@ src/cycles_ledger/cycles-ledger.did:
 	curl -Lo $@ https://github.com/dfinity/cycles-ledger/releases/download/cycles-ledger-v1.0.2/cycles-ledger.did
 	sed -e 's/vec nat8/blob/' -i $@
 
-src/cycles_ledger/cycles-ledger.wasm.gz:
-	curl -Lo $@ https://github.com/dfinity/cycles-ledger/releases/download/cycles-ledger-v1.0.2/cycles-ledger.wasm.gz
-
 src/ledger/ledger.did:
 	curl -Lo $@ https://raw.githubusercontent.com/dfinity/ic/$(IC_VERSION)/rs/rosetta-api/icp_ledger/ledger.did
 
 src/cmc/cmc.did:
 	curl -Lo $@ https://raw.githubusercontent.com/dfinity/ic/$(IC_VERSION)/rs/nns/cmc/cmc.did
 
-$(OBJ_DIR)/tipjar/tipjar.wasm $(OBJ_DIR)/tipjar/tipjar.did $(DIST_DIR)/index.html $(DIST_DIR)/index.js &: $(SRC)
-	dfx build --network=ic
+dist/tipjar.wasm dist/tipjar.did &: $(TIPJAR_SRC)
+	moc --public-metadata candid:service --public-metadata candid:args --public-metadata motoko:compiler \
+		--idl -c -o $@ $$(vessel sources) \
+		--actor-id-alias cmc rkp4c-7iaaa-aaaaa-aaaca-cai src/cmc/cmc.did \
+		--actor-id-alias cycles_ledger um5iw-rqaaa-aaaaq-qaaba-cai src/cycles_ledger/cycles-ledger.did \
+		--actor-id-alias ledger ryjl3-tyaaa-aaaaa-aaaba-cai src/ledger/ledger.did \
+		src/tipjar/main.mo
 
-upgrade: upgrade_backend upgrade_frontend
-
-upgrade_backend: $(OBJ_DIR)/tipjar/tipjar.wasm $(OBJ_DIR)/tipjar/tipjar.did
-	dfx canister --network=ic stop tipjar && \
-	dfx canister --network=ic install --mode=upgrade tipjar && \
-	dfx canister --network=ic start tipjar
-
-upgrade_frontend: $(DIST_DIR)/index.html $(DIST_DIR)/index.js
-	dfx canister --network=ic install --mode=upgrade tipjar_assets
+dist/logger.wasm dist/logger.did &: $(LOGGER_SRC)
+	moc --public-metadata candid:service --public-metadata candid:args --public-metadata motoko:compiler \
+		--idl -c -o $@ $$(vessel sources) \
+		src/logger/TextLogger.mo
 
 src/tipjar_assets/assets/faq.html: FAQ.md
 	tail -n"$$(($$(wc -l FAQ.md|cut -d\  -f1) - 1))" $< | \
@@ -57,4 +54,4 @@ distclean: clean
 	rm src/blackhole/blackhole.did src/blackhole/blackhole-opt.wasm \
 		src/ledger/ledger.did src/cmc/cmc.did
 
-.PHONY: clean distclean upgrade upgrade_backend upgrade_frontend download deploy
+.PHONY: clean distclean download build

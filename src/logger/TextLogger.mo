@@ -10,20 +10,20 @@ import Logger "mo:ic-logger/Logger";
 persistent actor TextLogger {
   transient let OWNER = Principal.fromText("y5mgz-ye6pv-bg3mu-purwq-cowuz-gkva5-hdsrv-leuqd-53hfi-kyjr4-oae");
 
-  stable var state : Logger.State<Text> = Logger.new<Text>(0, null);
+  let state : Logger.State<Text> = Logger.new<Text>(0, null);
   transient let logger = Logger.Logger<Text>(state);
 
   // Principals that are allowed to log messages.
-  stable var allowed : [Principal] = [OWNER];
+  var allowed : [Principal] = [OWNER];
 
   // Set allowed principals.
-  public shared (msg) func allow(ids: [Principal]) {
+  public shared (msg) func allow(ids: [Principal]) : () {
     assert(msg.caller == OWNER);
     allowed := ids;
   };
 
   // Add a set of messages to the log.
-  public shared (msg) func append(msgs: [Text]) {
+  public shared (msg) func append(msgs: [Text]) : () {
     assert(Option.isSome(Array.find(allowed, func (id: Principal) : Bool { msg.caller == id })));
     logger.append(msgs);
   };
@@ -42,7 +42,7 @@ persistent actor TextLogger {
   };
 
   // Drop past buckets (oldest first).
-  public shared (msg) func pop_buckets(num: Nat) {
+  public shared (msg) func pop_buckets(num: Nat) : () {
     assert(msg.caller == OWNER);
     logger.pop_buckets(num)
   }

@@ -1,0 +1,24 @@
+canisters:
+  - name: tipjar
+    build:
+      steps: 
+        - type: pre-built
+          path: dist/tipjar.wasm
+  - name: blackhole
+    build:
+      steps: 
+        - type: pre-built
+          path: src/blackhole/blackhole-opt.wasm
+  - name: logger
+    build:
+      steps: 
+        - type: pre-built
+          path: dist/logger.wasm
+  - name: frontend
+    recipe:
+      type: "@dfinity/asset-canister@v2.2.1"
+      configuration:
+        build:
+          - rsync -a src/tipjar_assets dist/tipjar_assets
+          - npm run build
+        dir: dist/tipjar_assets

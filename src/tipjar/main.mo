@@ -1,4 +1,3 @@
-import AccountId "mo:accountid/AccountId";
 import Array "mo:base/Array";
 import Blob "mo:base/Blob";
 import Cycles "mo:base/ExperimentalCycles";
@@ -16,13 +15,20 @@ import TrieSet "mo:base/TrieSet";
 import CMC "canister:cmc";
 import ICPLedger "canister:ledger";
 import CyclesLedger "canister:cycles_ledger";
-import Logger "canister:logger";
-import Blackhole "canister:blackhole";
 
+import Runtime "mo:core/Runtime";
 import Queue "mo:mutable-queue/Queue";
 import Util "./Util";
+import B "../blackhole/blackhole.did";
 
 shared (installation) persistent actor class TipJar() = self {
+
+  type Blackhole = B.Self;
+  type Logger = actor { append: shared ([Text]) -> (); };
+  transient let ?blackholeId = Runtime.envVar<system>("PUBLIC_CANISTER_ID:blackhole") else Runtime.trap("Missing blackhole canister id from envrionment");
+  transient let ?loggerId = Runtime.envVar<system>("PUBLIC_CANISTER_ID:logger") else Runtime.trap("Missing logger canister id from environment");
+  transient let Blackhole : Blackhole = actor(blackholeId);
+  transient let Logger : Logger = actor(loggerId);
 
   // Some administrative functions are only accessible by who created this canister.
   transient let OWNER = installation.caller;
@@ -73,7 +79,7 @@ shared (installation) persistent actor class TipJar() = self {
 
   // General stats that we track.
   type TipJar = { var funded: Cycle; var allocated: Cycle; var donated: Cycle; };
-  stable var tipjar : TipJar = { var funded = 0; var allocated = 0; var donated = 0 };
+  let tipjar : TipJar = { var funded = 0; var allocated = 0; var donated = 0 };
 
   // Return this canister's cycle balance without counting users' funds.
   func selfBalance() : Cycle {
@@ -98,8 +104,8 @@ shared (installation) persistent actor class TipJar() = self {
   // User related operations
   //////////////////////////////////////////////////////////////////////////
 
-  stable var canisters_v3: Queue<Canister> = Queue.empty();
-  stable var users_v3: Queue<User> = Queue.empty();
+  let canisters_v3: Queue<Canister> = Queue.empty();
+  let users_v3: Queue<User> = Queue.empty();
 
   // Use this function to get the user list instead of the stable variable itself.
   func all_users() : Queue<User> {
@@ -132,7 +138,7 @@ shared (installation) persistent actor class TipJar() = self {
     let self_principal = Principal.fromActor(self);
     Option.map(Queue.find(all_users(), func (user: User) : Bool {
       let subaccount = Util.principalToSubAccount(user.id);
-      let account = Util.toHex(AccountId.fromPrincipal(self_principal, ?subaccount));
+      let account = Util.toHex(Principal.toLedgerAccount(self_principal, ?subaccount));
       return account == id;
     }), func (user: User) : Principal { user.id })
   };
@@ -205,9 +211,9 @@ shared (installation) persistent actor class TipJar() = self {
   };
 
   // Test function that directly calls ledger's notify. Used by admin for debugging only.
-  public shared (arg) func testNotify(id: Principal, icp: ICP, height: ICPLedger.BlockIndex) {
+  public shared (arg) func testNotify(id: Principal, icp: ICP, height: ICPLedger.BlockIndex) : async () {
     assert(arg.caller == OWNER);
-    let user = Option.unwrap(findUser(id));
+    let user = Util.unwrap(findUser(id));
     let deposit : DepositV2 = { user = user; token = #ICP(icp) };
     depositing := ?(deposit, #Notify(height));
   };
@@ -219,7 +225,8 @@ shared (installation) persistent actor class TipJar() = self {
     // (userid, canisterid)
     type Pair = (Principal, Principal);
     func hash(x: Pair) : Hash.Hash {
-      Hash.hashNat8([Principal.hash(x.0), Principal.hash(x.1)])
+      let bytes = Array.chain([x.0, x.1], func(p:Principal): [Nat8] { Blob.toArray(Principal.toBlob(p)) });
+      Blob.hash(Blob.fromArray(bytes))
     };
     func eq(x: Pair, y: Pair) : Bool { x.0 == y.0 and x.1 == y.1 };
     var set = TrieSet.empty<Pair>();
@@ -344,8 +351,8 @@ shared (installation) persistent actor class TipJar() = self {
   type DepositV2 = { user: User; token: DepositToken; };
 
   // Deposit queue. Require users to ping to be added to this queue.
-  stable var deposits : Queue<Deposit> = Queue.empty();
-  stable var deposits_v2 : Queue<DepositV2> = Queue.empty();
+  var deposits : Queue<Deposit> = Queue.empty();
+  let deposits_v2 : Queue<DepositV2> = Queue.empty();
 
   type Stage = {
     #Mint;
@@ -360,14 +367,14 @@ shared (installation) persistent actor class TipJar() = self {
   transient var depositing : ?Depositing = null;
 
   // Stop future system activities after finishing pending ones.
-  public shared (arg) func stop(val: Bool) {
+  public shared (arg) func stop(val: Bool) : async () {
     assert(arg.caller == OWNER);
     stopping := val;
   };
 
   // A user has to 'ping' to see updated account balance.
   // If some ICP is received, it will be inserted into the deposit queue.
-  public shared (arg) func ping(for_user: ?Principal) {
+  public shared (arg) func ping(for_user: ?Principal) : async () {
     // Do nothing when we are stopping.
     if (stopping) return;
     let log = logger("ping");
@@ -383,9 +390,9 @@ shared (installation) persistent actor class TipJar() = self {
 
     let owner = Principal.fromActor(self);
     let subaccount = Util.principalToSubAccount(id);
-    let account = Blob.fromArray(AccountId.fromPrincipal(owner, ?subaccount));
+    let account = Principal.toLedgerAccount(owner, ?subaccount);
     try {
-      let cycles = await CyclesLedger.icrc1_balance_of({ owner = owner; subaccount = ?Blob.fromArray(subaccount) });
+      let cycles = await CyclesLedger.icrc1_balance_of({ owner = owner; subaccount = ?subaccount });
       if (cycles >= TCYCLES_MIN_DEPOSIT and
           Option.isNull(Queue.find<DepositV2>(deposits_v2, func(x) { x.user.id == id })) and
           not (Option.getMapped(depositingInfo(), Util.eqId(id), false))) {
@@ -460,17 +467,17 @@ shared (installation) persistent actor class TipJar() = self {
         let user = deposit.user;
         let from_subaccount = Util.principalToSubAccount(user.id);
         let to_subaccount = Util.principalToSubAccount(Principal.fromActor(self));
-        let account = AccountId.fromPrincipal(CYCLE_MINTING_CANISTER, ?to_subaccount);
+        let account = Principal.toLedgerAccount(CYCLE_MINTING_CANISTER, ?to_subaccount);
         ignore log("BeforeTransfer " # debug_show({ user = user.id; deposit = deposit.token }));
         try {
           depositing := ?(deposit, #MintCalled);
           switch (deposit.token) {
             case (#ICP(icp)) {
               let result = await ICPLedger.transfer({
-                    to = Blob.fromArray(account);
+                    to = account;
                     fee = { e8s = ICP_FEE };
                     memo = TOP_UP_CANISTER_MEMO;
-                    from_subaccount = ?Blob.fromArray(from_subaccount);
+                    from_subaccount = ?from_subaccount;
                     amount = { e8s = icp.e8s - ICP_FEE };
                     created_at_time = null;
                   });
@@ -488,7 +495,7 @@ shared (installation) persistent actor class TipJar() = self {
             case (#TCYCLES(cycles)) {
               let result = await CyclesLedger.withdraw({
                     to = Principal.fromActor(self);
-                    from_subaccount = ?Blob.fromArray(from_subaccount);
+                    from_subaccount = ?from_subaccount;
                     amount = cycles - TCYCLES_FEE;
                     created_at_time = null;
                   });
@@ -564,7 +571,7 @@ shared (installation) persistent actor class TipJar() = self {
   };
 
   // When we are ready to topup a canister, we add it to the topup_queue.
-  transient var topup_queue : Queue<Canister> = Queue.empty<Canister>();
+  transient let topup_queue : Queue<Canister> = Queue.empty<Canister>();
 
   // The canister that we are currently trying to topup.
   transient var topping_up : ?Canister = null;
@@ -613,8 +620,7 @@ shared (installation) persistent actor class TipJar() = self {
               debug_show({ canister = canister.id; cycle = donation }));
             let management : Management = actor("aaaaa-aa");
             try {
-              Cycles.add<system>(donation);
-              await management.deposit_cycles({canister_id = canister.id});
+              await (with cycles = donation) management.deposit_cycles({canister_id = canister.id});
               ignore log("AfterDeposit")
             } catch (err) {
               ignore log("AfterDeposit " # show_error(err))

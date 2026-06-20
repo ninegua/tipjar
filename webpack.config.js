@@ -7,9 +7,7 @@ const CopyPlugin = require("copy-webpack-plugin");
 
 const isDevelopment = process.env.NODE_ENV !== "production";
 
-const frontendDirectory = "tipjar_assets";
-
-const frontend_entry = path.join("src", frontendDirectory, "src", "index.html");
+const frontend_entry = path.join("src", "frontend", "index.html");
 
 module.exports = {
   target: "web",
@@ -37,7 +35,7 @@ module.exports = {
   },
   output: {
     filename: "index.js",
-    path: path.join(__dirname, "dist", frontendDirectory),
+    path: path.join(__dirname, "dist", "tipjar_assets"),
   },
 
   // Depending in the language or framework you are using for
@@ -70,7 +68,7 @@ module.exports = {
     new CopyPlugin({
       patterns: [
         {
-          from: `src/${frontendDirectory}/src/.ic-assets.json*`,
+          from: `src/frontend/.ic-assets.json*`,
           to: ".ic-assets.json5",
           noErrorOnMissing: true,
         },
@@ -88,9 +86,9 @@ module.exports = {
         },
       },
     },
-    static: path.resolve(__dirname, "src", frontendDirectory, "assets"),
+    static: path.resolve(__dirname, "src", "tipjar_assets"),
     hot: true,
-    watchFiles: [path.resolve(__dirname, "src", frontendDirectory)],
+    watchFiles: [path.resolve(__dirname, "src", "frontend"), path.resolve(__dirname, "src", "tipjar_assets")],
     liveReload: true,
   },
 };
