@@ -2295,3 +2295,6 @@ var qrcode = function() {
 }(function () {
     return qrcode;
 }));
+
+// ESM support
+export default qrcode;
