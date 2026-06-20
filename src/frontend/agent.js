@@ -1,22 +1,20 @@
-import { Ed25519KeyIdentity } from "@dfinity/identity";
-import { Actor, HttpAgent, AnonymousIdentity } from "@dfinity/agent";
-import { Principal } from "@dfinity/principal";
-import { AuthClient } from "@dfinity/auth-client";
-import { encodeIcrcAccount } from "@dfinity/ledger-icrc";
+import { Ed25519KeyIdentity } from "@icp-sdk/core/identity";
+import { Actor, HttpAgent, AnonymousIdentity } from "@icp-sdk/core/agent";
+import { Principal } from "@icp-sdk/core/principal";
+import { AuthClient } from "@icp-sdk/auth/client";
+import { encodeIcrcAccount } from "@icp-sdk/canisters/ledger/icrc";
+import { getCanisterEnv } from "@icp-sdk/core/agent/canister-env";
 import pemfile from "pem-file";
 
-import {
-  idlFactory as cycles_ledger_idl,
-  canisterId as cycles_ledger_id,
-} from "../declarations/cycles_ledger";
-import {
-  idlFactory as icp_ledger_idl,
-  canisterId as icp_ledger_id,
-} from "../declarations/ledger";
-import {
-  idlFactory as tipjar_idl,
-  canisterId as tipjar_id,
-} from "../declarations/tipjar";
+const env = getCanisterEnv();
+
+const tipjar_id = env["PUBLIC_CANISTER_ID:tipjar"];
+const cycles_ledger_id = "um5iw-rqaaa-aaaaq-qaaba-cai";
+const icp_ledger_id = "ryjl3-tyaaa-aaaaa-aaaba-cai";
+
+import { idlFactory as cycles_ledger_idl } from "../declarations/cycles_ledger";
+import { idlFactory as icp_ledger_idl } from "../declarations/ledger";
+import { idlFactory as tipjar_idl } from "../declarations/tipjar";
 import crc32 from "crc-32";
 import { sha224 } from "@noble/hashes/sha256";
 
@@ -131,12 +129,7 @@ function createActors(agent) {
 }
 
 function createHttpAgent(identity) {
-  let http_agent = new HttpAgent({ identity });
-  if (process.env.NODE_ENV !== "production") {
-    http_agent.fetchRootKey().catch((err) => {
-      console.log(err);
-    });
-  }
+  let http_agent = new HttpAgent({ identity, rootKey: env.IC_ROOT_KEY });
   return http_agent;
 }
 
@@ -161,13 +154,9 @@ export async function decodeIdentity(pem) {
 export class Agent {
   constructor(auth_client_callback) {
     this.auth_client_callback = auth_client_callback;
-    AuthClient.create({ idleOptions: { disableDefaultIdleCallback: true } })
-      .then((client) => {
-        this.try_activate_auth_client(client);
-      })
-      .catch((err) => {
-        console.log(err);
-      });
+    this.auth_client = new AuthClient({
+      idleOptions: { disableDefaultIdleCallback: true },
+    });
   }
 
   get_user_info() {
@@ -202,11 +191,10 @@ export class Agent {
     );
   }
 
-  async try_activate_auth_client(client) {
-    this.auth_client = client;
-    let authenticated = await client.isAuthenticated();
+  try_activate_auth_client() {
+    let authenticated = this.auth_client.isAuthenticated();
     if (authenticated) {
-      await this.activate_auth_client();
+      this.activate_auth_client();
     }
     if (!this.state) {
       this.try_activate_local_client();
@@ -218,7 +206,7 @@ export class Agent {
   async activate_auth_client(callback) {
     try {
       if (!this.is_authenticated()) {
-        let auth_identity = await this.auth_client.getIdentity();
+        let auth_identity = this.auth_client.getIdentity();
         var result;
         if (this.http_agent) {
           result = await this.tipjar_delegate(auth_identity.getPrincipal());
@@ -338,7 +326,7 @@ export class Agent {
 
   async ii_login(login_callback) {
     try {
-      await this.auth_client.login({
+      await this.auth_client.signIn({
         maxTimeToLive: 30n * 24n * 3600000000000n, // expire in 30 days, but II max is 8 days.
         onSuccess: async () => {
           await this.activate_auth_client(login_callback);
@@ -357,7 +345,7 @@ export class Agent {
   async logout() {
     this.set_user_info(null);
     if (this.state.authenticated == "auth") {
-      await this.auth_client.logout();
+      await this.auth_client.signOut();
     }
     this.state.authenticated = null;
     this.activate_anonymous_client();

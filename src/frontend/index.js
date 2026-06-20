@@ -1,4 +1,4 @@
-import { Principal } from "@dfinity/principal";
+import { Principal } from "@icp-sdk/core/principal";
 import qrcode from "./qrcode";
 import { Agent, decodeIdentity } from "./agent";
 
@@ -657,6 +657,7 @@ function show_add_canister_form(evt) {
 }
 
 agent = new Agent(update_login_status);
+agent.try_activate_auth_client();
 
 async function start_pem_login(evt) {
   let import_pem_anchor = document.getElementById("import_pem_anchor");

@@ -29,7 +29,10 @@ src/ledger/ledger.did:
 src/cmc/cmc.did:
 	curl -Lo $@ https://raw.githubusercontent.com/dfinity/ic/$(IC_VERSION)/rs/nns/cmc/cmc.did
 
-dist/tipjar.wasm dist/tipjar.did &: $(TIPJAR_SRC)
+dist:
+	mkdir -p $@
+
+dist/tipjar.wasm dist/tipjar.did &: $(TIPJAR_SRC) | dist
 	moc --public-metadata candid:service --public-metadata candid:args --public-metadata motoko:compiler \
 		--idl -c -o $@ $$(vessel sources) \
 		--actor-id-alias cmc rkp4c-7iaaa-aaaaa-aaaca-cai src/cmc/cmc.did \
@@ -37,7 +40,7 @@ dist/tipjar.wasm dist/tipjar.did &: $(TIPJAR_SRC)
 		--actor-id-alias ledger ryjl3-tyaaa-aaaaa-aaaba-cai src/ledger/ledger.did \
 		src/tipjar/main.mo
 
-dist/logger.wasm dist/logger.did &: $(LOGGER_SRC)
+dist/logger.wasm dist/logger.did &: $(LOGGER_SRC) | dist
 	moc --public-metadata candid:service --public-metadata candid:args --public-metadata motoko:compiler \
 		--idl -c -o $@ $$(vessel sources) \
 		src/logger/TextLogger.mo
