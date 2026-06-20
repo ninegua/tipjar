@@ -12,9 +12,9 @@ const tipjar_id = env["PUBLIC_CANISTER_ID:tipjar"];
 const cycles_ledger_id = "um5iw-rqaaa-aaaaq-qaaba-cai";
 const icp_ledger_id = "ryjl3-tyaaa-aaaaa-aaaba-cai";
 
-import { idlFactory as cycles_ledger_idl } from "../declarations/cycles_ledger";
-import { idlFactory as icp_ledger_idl } from "../declarations/ledger";
-import { idlFactory as tipjar_idl } from "../declarations/tipjar";
+import { idlFactory as cycles_ledger_idl } from "../../dist/cycles-ledger";
+import { idlFactory as icp_ledger_idl } from "../../dist/icp-ledger";
+import { idlFactory as tipjar_idl } from "../../dist/tipjar";
 import crc32 from "crc-32";
 import { sha224 } from "@noble/hashes/sha256";
 

@@ -13,7 +13,7 @@ import Time "mo:base/Time";
 import TrieSet "mo:base/TrieSet";
 
 import CMC "canister:cmc";
-import ICPLedger "canister:ledger";
+import ICPLedger "canister:icp_ledger";
 import CyclesLedger "canister:cycles_ledger";
 
 import Runtime "mo:core/Runtime";

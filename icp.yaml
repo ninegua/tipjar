@@ -19,6 +19,5 @@ canisters:
       type: "@dfinity/asset-canister@v2.2.1"
       configuration:
         build:
-          - rsync -a --delete src/tipjar_assets/ dist/tipjar_assets/
-          - npm run build
+          - make frontend
         dir: dist/tipjar_assets
