@@ -11,7 +11,7 @@ IC_VERSION=a17247bd86c7aa4e87742bf74d108614580f216d
 
 build: backend frontend
 
-backend: dist/tipjar.wasm dist/logger.wasm
+backend: download dist/tipjar.wasm dist/logger.wasm
 
 frontend: dist/tipjar_assets/index.js
 

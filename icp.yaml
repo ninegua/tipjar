@@ -8,7 +8,7 @@ canisters:
     build:
       steps: 
         - type: pre-built
-          path: src/blackhole/blackhole-opt.wasm
+          path: dist/blackhole-opt.wasm
   - name: logger
     build:
       steps: 
