@@ -1,0 +1,18 @@
+name: "ci"
+
+on: [push, pull_request]
+
+jobs:
+  ci:
+    name: "ci"
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v6
+    - uses: cachix/install-nix-action@v31
+      with:
+        nix_path: nixpkgs=channel:nixos-26.05
+    - uses: cachix/cachix-action@v17
+      with:
+        name: ninegua
+        authToken: '${{ secrets.CACHIX_AUTH_TOKEN }}'
+    - run: nix-build --no-out-link
