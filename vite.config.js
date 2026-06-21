@@ -1,7 +1,7 @@
 import { defineConfig } from "vite";
 import { execSync } from "child_process";
 import { resolve } from "path";
-import { nodePolyfills } from "vite-plugin-node-polyfills";
+import { nodePolyfills } from "vite-plugin-node-polyfills-vite8";
 
 export default defineConfig(({ command }) => {
   let config = {
@@ -19,12 +19,7 @@ export default defineConfig(({ command }) => {
         },
       },
     },
-    plugins: [
-      nodePolyfills({
-        include: ["buffer", "process"],
-        globals: { Buffer: true, global: true, process: true },
-      }),
-    ],
+    plugins: [nodePolyfills()],
   };
   if (command !== "serve") {
     return config;
@@ -88,7 +83,7 @@ export default defineConfig(({ command }) => {
     },
     watch: {
       usePolling: true,
-      ignored: ["!**/src/frontend/**" ],
+      ignored: ["!**/src/frontend/**"],
     },
   };
   return config;

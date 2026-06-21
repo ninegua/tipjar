@@ -20,12 +20,11 @@
     "qrcode": "^1.5.4"
   },
   "devDependencies": {
-    "@noble/hashes": "^1.3.2",
+    "@noble/hashes": "^1.8.0",
     "crc-32": "^1.2.2",
-    "dotenv": "^16.0.3",
     "pem-file": "^1.0.1",
-    "vite": "^5.4.0",
-    "vite-plugin-node-polyfills": "^0.22.0"
+    "vite": "^8.0.0",
+    "vite-plugin-node-polyfills-vite8": "^0.25.4"
   },
   "engines": {
     "node": "^12 || ^14 || ^16 || >=17",
