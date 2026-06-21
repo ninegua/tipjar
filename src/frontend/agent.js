@@ -192,8 +192,8 @@ export class Agent {
   }
 
   try_activate_auth_client() {
-    let authenticated = this.auth_client.isAuthenticated();
-    if (authenticated) {
+    let auth_client_authenticated = this.auth_client.isAuthenticated();
+    if (auth_client_authenticated) {
       this.activate_auth_client();
     }
     if (!this.state) {
@@ -206,7 +206,7 @@ export class Agent {
   async activate_auth_client(callback) {
     try {
       if (!this.is_authenticated()) {
-        let auth_identity = this.auth_client.getIdentity();
+        let auth_identity = await this.auth_client.getIdentity();
         var result;
         if (this.http_agent) {
           result = await this.tipjar_delegate(auth_identity.getPrincipal());
@@ -328,18 +328,13 @@ export class Agent {
     try {
       await this.auth_client.signIn({
         maxTimeToLive: 30n * 24n * 3600000000000n, // expire in 30 days, but II max is 8 days.
-        onSuccess: async () => {
-          await this.activate_auth_client(login_callback);
-        },
-        onError: (err) => {
-          login_callback();
-          console.log(err);
-        },
       });
+      await this.activate_auth_client(login_callback);
     } catch (err) {
       login_callback();
       console.log(err);
     }
+
   }
 
   async logout() {
