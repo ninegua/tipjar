@@ -46,23 +46,24 @@ I also wrote down [some random notes](NOTES.md) on the design decisions in makin
 
 **Local deployment**
 
-If you want to run tipjar locally in your [dfx] environment, you will need [GNU make], [curl], and a working [vessel] installation too.
+You will need [icp-cli], [GNU make], [curl], and a working [vessel] installation too.
 For [nix] users, simply entering `nix-shell` is enough.
 
 ```
-dfx start --background
-make deploy
+icp network start -d
+make build
+icp deploy
 ```
 
-This will start a dfx replica, download necessary files, and deploy all canisters locally.
+This will start a local ICP network node, download necessary files, and deploy all canisters locally.
 
 
-[cycles]: https://internetcomputer.org/docs/current/developer-docs/getting-started/cycles/overview
+[cycles]: https://docs.internetcomputer.org/concepts/cycles/
 [black hole]: https://github.com/ninegua/ic-blackhole
-[canisters]: https://internetcomputer.org/how-it-works/canister-lifecycle/
+[canisters]: https://docs.internetcomputer.org/concepts/canisters/
 [Internet Computer]: https://dashboard.internetcomputer.org
 [GNU make]: https://www.gnu.org/software/make
 [curl]: https://curl.se
-[dfx]: https://internetcomputer.org/docs/current/developer-docs/developer-tools/dev-tools-overview/#dfx
+[icp-cli]: https://cli.internetcomputer.org/1.0/
 [vessel]: https://github.com/dfinity/vessel
 [nix]: https://nixos.org/download.html#download-nix

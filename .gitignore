@@ -15,3 +15,6 @@
 node_modules/
 dist/
 declarations/
+
+# generated src
+src/public/faq.html

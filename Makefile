@@ -2,7 +2,7 @@ DIST_DIR=./dist
 TIPJAR_SRC=$(wildcard src/tipjar/*.mo)
 LOGGER_SRC=$(wildcard src/logger/*.mo)
 FRONTEND_SRC=$(wildcard src/frontend/*) $(wildcard src/public/*) src/public/faq.html
-TIPJAR_DEPS=dist/blackhole.did dist/icp-ledger.did dist/cmc.did dist/cycles-ledger.did
+TIPJAR_DEPS=dist/blackhole.did dist/icp-ledger.did dist/cmc.did dist/cycles-ledger.did dist/blackhole.did.mo
 FRONTEND_DEPS=dist/tipjar.js dist/cycles-ledger.js dist/icp-ledger.js
 IC_VERSION=a17247bd86c7aa4e87742bf74d108614580f216d
 
@@ -36,6 +36,9 @@ dist/cmc.did: | dist
 dist/%.js: dist/%.did | dist
 	didc bind -t js $< > $@
 
+node_modules:
+	npm i
+
 dist:
 	mkdir -p $@
 
@@ -52,7 +55,7 @@ dist/logger.wasm dist/logger.did &: $(LOGGER_SRC) | dist
 		--idl -c -o $@ $$(vessel sources) \
 		src/logger/TextLogger.mo
 
-dist/frontend/index.js: $(FRONTEND_DEPS) $(FRONTEND_SRC)
+dist/frontend/index.js: $(FRONTEND_DEPS) $(FRONTEND_SRC) | dist node_modules
 	npm run build
 
 src/public/faq.html: FAQ.md

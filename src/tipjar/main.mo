@@ -19,7 +19,7 @@ import CyclesLedger "canister:cycles_ledger";
 import Runtime "mo:core/Runtime";
 import Queue "mo:mutable-queue/Queue";
 import Util "./Util";
-import B "../blackhole/blackhole.did";
+import B "../../dist/blackhole.did";
 
 shared (installation) persistent actor class TipJar() = self {
 
