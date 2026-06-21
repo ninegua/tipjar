@@ -1,16 +1,16 @@
-import Array "mo:base/Array";
-import Blob "mo:base/Blob";
-import Debug "mo:base/Debug";
-import Iter "mo:base/Iter";
-import Nat "mo:base/Nat";
-import Nat64 "mo:base/Nat64";
-import Nat8 "mo:base/Nat8";
-import Option "mo:base/Option";
-import Prelude "mo:base/Prelude";
-import Principal "mo:base/Principal";
-import Result "mo:base/Result";
-import Text "mo:base/Text";
-import Time "mo:base/Time";
+import Array "mo:core/Array";
+import Blob "mo:core/Blob";
+import Debug "mo:core/Debug";
+import Iter "mo:core/Iter";
+import Nat "mo:core/Nat";
+import Nat64 "mo:core/Nat64";
+import Nat8 "mo:core/Nat8";
+import Option "mo:core/Option";
+import Principal "mo:core/Principal";
+import Result "mo:core/Result";
+import Runtime "mo:core/Runtime";
+import Text "mo:core/Text";
+import Time "mo:core/Time";
 
 import Queue "mo:mutable-queue/Queue";
 
@@ -105,7 +105,7 @@ module Util {
   // Same as Option.unwrap, but without the annoying warning.
   public func unwrap<T>(x: ?T) : T {
     switch x {
-      case null { Prelude.unreachable() };
+      case null { Runtime.unreachable() };
       case (?x_) { x_ };
     }
   };
@@ -422,10 +422,10 @@ module Util {
   let hexChars = ["0","1","2","3","4","5","6","7","8","9","a","b","c","d","e","f"];
 
   public func toHex(blob: Blob): Text {
-    Text.join("", Iter.map<Nat8, Text>(blob.vals(), func (x: Nat8) : Text {
+    Text.join(Iter.map(blob.vals(), func (x: Nat8) : Text {
       let a = Nat8.toNat(x / 16);
       let b = Nat8.toNat(x % 16);
       hexChars[a] # hexChars[b]
-    }))
+    }), "")
   };
 }

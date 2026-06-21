@@ -1,9 +1,9 @@
 // Persistent logger keeping track of what is going on.
 
-import Array "mo:base/Array";
-import Nat "mo:base/Nat";
-import Option "mo:base/Option";
-import Principal "mo:base/Principal";
+import Array "mo:core/Array";
+import Nat "mo:core/Nat";
+import Option "mo:core/Option";
+import Principal "mo:core/Principal";
 
 import Logger "mo:ic-logger/Logger";
 

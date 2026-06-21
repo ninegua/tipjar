@@ -1,16 +1,16 @@
-import Array "mo:base/Array";
-import Blob "mo:base/Blob";
-import Cycles "mo:base/ExperimentalCycles";
-import Error "mo:base/Error";
-import Hash "mo:base/Hash";
-import Int "mo:base/Int";
-import Nat "mo:base/Nat";
-import Nat64 "mo:base/Nat64";
-import Option "mo:base/Option";
-import Result "mo:base/Result";
-import Principal "mo:base/Principal";
-import Time "mo:base/Time";
-import TrieSet "mo:base/TrieSet";
+import Array "mo:core/Array";
+import Cycles "mo:core/Cycles";
+import Error "mo:core/Error";
+import Int "mo:core/Int";
+import Nat "mo:core/Nat";
+import Nat64 "mo:core/Nat64";
+import Option "mo:core/Option";
+import Order "mo:core/Order";
+import Principal "mo:core/Principal";
+import Result "mo:core/Result";
+import Time "mo:core/Time";
+import { Tuple2 } "mo:core/Tuples";
+import Set "mo:core/Set";
 
 import CMC "canister:cmc";
 import ICPLedger "canister:icp_ledger";
@@ -224,28 +224,24 @@ shared (installation) persistent actor class TipJar() = self {
     assert(arg.caller == OWNER);
     // (userid, canisterid)
     type Pair = (Principal, Principal);
-    func hash(x: Pair) : Hash.Hash {
-      let bytes = Array.chain([x.0, x.1], func(p:Principal): [Nat8] { Blob.toArray(Principal.toBlob(p)) });
-      Blob.hash(Blob.fromArray(bytes))
-    };
-    func eq(x: Pair, y: Pair) : Bool { x.0 == y.0 and x.1 == y.1 };
-    var set = TrieSet.empty<Pair>();
+    let set = Set.empty<Pair>();
     var out = "";
+    func compare (a: Pair, b: Pair) : Order.Order = Tuple2.compare(a, b, Principal.compare, Principal.compare);
     for (user in Queue.toIter(all_users())) {
        out := out # "User " # Principal.toText(user.id) # "\n";
        for (alloc in Queue.toIter(user.allocations)) {
           let elem = (user.id, alloc.canister.id);
-          if (TrieSet.mem(set, elem, hash(elem), eq)) {
+          if (Set.contains(set, compare, elem)) {
              out := out # "  Duplicate allocation " # Principal.toText(alloc.canister.id) # "\n";
           };
-          set := TrieSet.put(set, elem, hash(elem), eq);
+          let _ = Set.insert(set, compare, elem);
        }
     };
     for (canister in Queue.toIter(all_canisters())) {
        out := out # "Canister " # Principal.toText(canister.id) # "\n";
        for (donor in Queue.toIter(canister.donors)) {
           let elem = (donor.id, canister.id);
-          if (not TrieSet.mem(set, elem, hash(elem), eq)) {
+          if (not Set.contains(set, compare, elem)) {
             out := out # "\n  Missing donor " # Principal.toText(donor.id) # "\n";
           }
        }
