@@ -20,4 +20,4 @@ canisters:
       configuration:
         build:
           - make frontend
-        dir: dist/tipjar_assets
+        dir: dist/frontend

@@ -1,5 +1,5 @@
 import { Principal } from "@icp-sdk/core/principal";
-import qrcode from "./qrcode";
+import QRCode from "qrcode";
 import { Agent, decodeIdentity } from "./agent";
 
 const MIN_ALLOCATION = 0.001; // in trillion cycles
@@ -63,15 +63,13 @@ function show_account_id() {
   if (account_id != last_account_id) {
     last_account_id = account_id;
     document.getElementById("account_id").value = account_id;
-    let typeNumber = 0;
-    let errorCorrectionLevel = "L";
-    let qr = qrcode(typeNumber, errorCorrectionLevel);
-    qr.addData(account_id.toUpperCase(), "Alphanumeric");
-    qr.make();
-    let node = document.getElementById("account_qrcode");
-    let img = document.createElement("div");
-    img.innerHTML = qr.createImgTag(3, 3);
-    node.replaceChild(img, node.children[0]);
+    QRCode.toDataURL(account_id.toUpperCase(), { errorCorrectionLevel: "L" })
+      .then((dataUrl) => {
+        let node = document.getElementById("account_qrcode");
+        let img = document.createElement("div");
+        img.innerHTML = `<img src="${dataUrl}" />`;
+        node.replaceChild(img, node.children[0]);
+      });
   }
 }
 
@@ -82,15 +80,13 @@ function show_icrc1_account() {
   if (account_id != last_account_id) {
     last_account_id = account_id;
     document.getElementById("account_id").value = account_id;
-    let typeNumber = 0;
-    let errorCorrectionLevel = "L";
-    let qr = qrcode(typeNumber, errorCorrectionLevel);
-    qr.addData(account_id.toUpperCase(), "Alphanumeric");
-    qr.make();
-    let node = document.getElementById("account_qrcode");
-    let img = document.createElement("div");
-    img.innerHTML = qr.createImgTag(3, 3);
-    node.replaceChild(img, node.children[0]);
+    QRCode.toDataURL(account_id.toUpperCase(), { errorCorrectionLevel: "L" })
+      .then((dataUrl) => {
+        let node = document.getElementById("account_qrcode");
+        let img = document.createElement("div");
+        img.innerHTML = `<img src="${dataUrl}" />`;
+        node.replaceChild(img, node.children[0]);
+      });
   }
 }
 

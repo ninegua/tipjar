@@ -1,10 +1,7 @@
 DIST_DIR=./dist
-IMAGES_SRC=$(wildcard src/tipjar_assets/assets/*.png) $(wildcard src/tipjar_assets/assets/*/*/*.png) $(wildcard src/tipjar_assets/assets/*.ico)
-ASSETS_SRC=$(wildcard src/tipjar_assets/src/*.html) $(wildcard src/tipjar_assets/src/*.js) src/tipjar_assets/assets/tipjar.webmanifest src/tipjar_assets/assets/faq.html
 TIPJAR_SRC=$(wildcard src/tipjar/*.mo)
 LOGGER_SRC=$(wildcard src/logger/*.mo)
-FRONTEND_SRC=$(wildcard src/frontend/*.html) $(wildcard src/frontend/*.js)
-STATIC_SRC=$(wildcard src/tipjar_assets/*)
+FRONTEND_SRC=$(wildcard src/frontend/*) $(wildcard src/public/*) src/public/faq.html
 TIPJAR_DEPS=dist/blackhole.did dist/icp-ledger.did dist/cmc.did dist/cycles-ledger.did
 FRONTEND_DEPS=dist/tipjar.js dist/cycles-ledger.js dist/icp-ledger.js
 IC_VERSION=a17247bd86c7aa4e87742bf74d108614580f216d
@@ -13,7 +10,7 @@ build: backend frontend
 
 backend: download dist/tipjar.wasm dist/logger.wasm
 
-frontend: dist/tipjar_assets/index.js
+frontend: dist/frontend/index.js
 
 download: $(TIPJAR_DEPS) dist/blackhole-opt.wasm
 
@@ -55,17 +52,16 @@ dist/logger.wasm dist/logger.did &: $(LOGGER_SRC) | dist
 		--idl -c -o $@ $$(vessel sources) \
 		src/logger/TextLogger.mo
 
-dist/tipjar_assets/index.js: $(FRONTEND_DEPS) $(FRONTEND_SRC) $(STATIC_SRC)
-	rsync -a --delete src/tipjar_assets/ dist/tipjar_assets/
+dist/frontend/index.js: $(FRONTEND_DEPS) $(FRONTEND_SRC)
 	npm run build
 
-src/tipjar_assets/assets/faq.html: FAQ.md
+src/public/faq.html: FAQ.md
 	tail -n"$$(($$(wc -l FAQ.md|cut -d\  -f1) - 1))" $< | \
 		pandoc --css=https://cdn.simplecss.org/simple.min.css --toc --toc-depth=6 \
 		--template=template.html -f markdown -t html --shift-heading-level-by=3 > $@
 
 clean:
-	rm -f src/tipjar_assets/assets/faq.html
+	rm -f src/public/faq.html
 
 distclean: clean
 	rm -rf dist

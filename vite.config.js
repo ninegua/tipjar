@@ -1,98 +1,95 @@
 import { defineConfig } from "vite";
+import { execSync } from "child_process";
 import { resolve } from "path";
 import { nodePolyfills } from "vite-plugin-node-polyfills";
-import { readdirSync, copyFileSync, mkdirSync } from "fs";
-import "dotenv/config";
 
-const canisterEnvKeys = Object.keys(process.env).filter((key) => {
-  if (key.includes("CANISTER")) return true;
-  if (key.includes("DFX")) return true;
-  return false;
-});
-
-const define = {};
-canisterEnvKeys.forEach((key) => {
-  define[`process.env.${key}`] = JSON.stringify(process.env[key]);
-});
-
-const outDir = resolve(__dirname, "dist/tipjar_assets");
-const assetsSrc = resolve(__dirname, "src/tipjar_assets");
-
-function copyAssetsPlugin() {
-  return {
-    name: "copy-assets",
-    closeBundle() {
-      mkdirSync(outDir, { recursive: true });
-      const entries = readdirSync(assetsSrc, { withFileTypes: true });
-      for (const entry of entries) {
-        if (entry.name === "index.html" || entry.name === "index.js" || entry.name === "index.js.map") {
-          continue;
-        }
-        const srcPath = resolve(assetsSrc, entry.name);
-        const destPath = resolve(outDir, entry.name);
-        if (entry.isDirectory()) {
-          mkdirSync(destPath, { recursive: true });
-          copyDirRecursive(srcPath, destPath);
-        } else {
-          copyFileSync(srcPath, destPath);
-        }
-      }
-    },
-  };
-}
-
-function copyDirRecursive(src, dest) {
-  const entries = readdirSync(src, { withFileTypes: true });
-  for (const entry of entries) {
-    const srcPath = resolve(src, entry.name);
-    const destPath = resolve(dest, entry.name);
-    if (entry.isDirectory()) {
-      mkdirSync(destPath, { recursive: true });
-      copyDirRecursive(srcPath, destPath);
-    } else {
-      copyFileSync(srcPath, destPath);
-    }
-  }
-}
-
-export default defineConfig({
-  base: "/",
-  root: "src/frontend",
-  build: {
-    outDir,
-    emptyOutDir: true,
-    sourcemap: false,
-    rollupOptions: {
-      input: resolve(__dirname, "src/frontend/index.html"),
-      output: {
-        entryFileNames: "index.js",
+export default defineConfig(({ command }) => {
+  let config = {
+    base: "/",
+    root: "src/frontend",
+    publicDir: resolve(__dirname, "src/public"),
+    build: {
+      outDir: resolve(__dirname, "dist/frontend"),
+      emptyOutDir: true,
+      sourcemap: false,
+      rollupOptions: {
+        input: resolve(__dirname, "src/frontend/index.html"),
+        output: {
+          entryFileNames: "index.js",
+        },
       },
     },
-  },
-  define,
-  plugins: [
-    nodePolyfills({
-      include: ["buffer", "process"],
-      globals: { Buffer: true, global: true, process: true },
+    plugins: [
+      nodePolyfills({
+        include: ["buffer", "process"],
+        globals: { Buffer: true, global: true, process: true },
+      }),
+    ],
+  };
+  if (command !== "serve") {
+    return config;
+  }
+
+  const environment = process.env.ICP_ENVIRONMENT || "local";
+  const CANISTER_NAME = "tipjar";
+
+  // Dev server mode: configure ic_env cookie and proxy
+  const networkStatus = JSON.parse(
+    execSync(`icp network status -e ${environment} --json`, {
+      encoding: "utf-8",
     }),
-    copyAssetsPlugin(),
-  ],
-  server: {
+  );
+  const rootKey = networkStatus.root_key;
+  const proxyTarget = networkStatus.api_url;
+
+  // Backend must be deployed before starting dev server
+  let canisterId;
+  try {
+    canisterId = execSync(
+      `icp canister status ${CANISTER_NAME} -e ${environment} -i`,
+      {
+        encoding: "utf-8",
+      },
+    ).trim();
+  } catch {
+    console.error(`
+❌ Backend canister "${CANISTER_NAME}" not found in environment "${environment}"
+
+   Before running the dev server, deploy the backend canister:
+
+     icp deploy ${CANISTER_NAME} -e ${environment}
+`);
+    process.exit(1);
+  }
+
+  console.log(`
+🌐 ICP Dev Server Configuration
+
+   Environment:         ${environment}
+   Backend Canister ID: ${canisterId}
+   IC API URL:          ${proxyTarget}
+   IC Root Key:         ${rootKey.slice(0, 20)}...${rootKey.slice(-20)}
+`);
+
+  config.server = {
     host: "0.0.0.0",
     hmr: true,
+    headers: {
+      // Note: ic_root_key must be lowercase - library converts to uppercase IC_ROOT_KEY
+      "Set-Cookie": `ic_env=${encodeURIComponent(
+        `PUBLIC_CANISTER_ID:${CANISTER_NAME}=${canisterId}&ic_root_key=${rootKey}`,
+      )}; SameSite=Lax;`,
+    },
     proxy: {
       "/api": {
-        target: "http://127.0.0.1:8080",
+        target: proxyTarget,
         changeOrigin: true,
-        rewrite: (path) => path.replace(/^\/api/, "/api"),
       },
     },
     watch: {
       usePolling: true,
-      ignored: [
-        "!**/src/frontend/**",
-        "!**/src/tipjar_assets/**",
-      ],
+      ignored: ["!**/src/frontend/**" ],
     },
-  },
+  };
+  return config;
 });
