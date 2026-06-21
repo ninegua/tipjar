@@ -5,7 +5,7 @@
   , dependencies = [] : List Text
   },
   { name = "ic-logger"
-  , version = "6602739843dcf58278a8e79204232b46c2a7a155"
+  , version = "f02379ae2dcbbf8c70a88c3e81a6be9dea9e8917"
   , repo = "https://github.com/ninegua/ic-logger"
   , dependencies = [ "core" ]
   },

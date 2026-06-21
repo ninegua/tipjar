@@ -4,7 +4,7 @@ LOGGER_SRC=$(wildcard src/logger/*.mo)
 FRONTEND_SRC=$(wildcard src/frontend/*) $(wildcard src/public/*) src/public/faq.html
 FRONTEND_DEPS=dist/tipjar.js dist/cycles-ledger.js dist/icp-ledger.js
 IC_VERSION=a17247bd86c7aa4e87742bf74d108614580f216d
-MOC_FLAGS?=$(shell vessel sources)
+MOC_FLAGS?=$(shell vessel sources) --enhanced-orthogonal-persistence
 DIDC?=didc
 
 BLACKHOLE_WASM?=dist/blackhole-opt.wasm

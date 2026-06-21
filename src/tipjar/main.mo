@@ -211,7 +211,7 @@ shared (installation) persistent actor class TipJar() = self {
   };
 
   // Test function that directly calls ledger's notify. Used by admin for debugging only.
-  public shared (arg) func testNotify(id: Principal, icp: ICP, height: ICPLedger.BlockIndex) : async () {
+  public shared (arg) func testNotify(id: Principal, icp: ICP, height: ICPLedger.BlockIndex) : () {
     assert(arg.caller == OWNER);
     let user = Util.unwrap(findUser(id));
     let deposit : DepositV2 = { user = user; token = #ICP(icp) };
@@ -363,14 +363,14 @@ shared (installation) persistent actor class TipJar() = self {
   transient var depositing : ?Depositing = null;
 
   // Stop future system activities after finishing pending ones.
-  public shared (arg) func stop(val: Bool) : async () {
+  public shared (arg) func stop(val: Bool) : () {
     assert(arg.caller == OWNER);
     stopping := val;
   };
 
   // A user has to 'ping' to see updated account balance.
   // If some ICP is received, it will be inserted into the deposit queue.
-  public shared (arg) func ping(for_user: ?Principal) : async () {
+  public shared (arg) func ping(for_user: ?Principal) : () {
     // Do nothing when we are stopping.
     if (stopping) return;
     let log = logger("ping");

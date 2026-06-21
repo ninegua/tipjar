@@ -21,3 +21,11 @@ canisters:
         build:
           - make frontend
         dir: dist/frontend
+environments:
+  - name: ic
+    network: ic
+    canisters: [tipjar, logger, frontend]
+    settings:
+      tipjar:
+        environment_variables:
+          "PUBLIC_CANISTER_ID:blackhole": "e3mmv-5qaaa-aaaah-aadma-cai"
