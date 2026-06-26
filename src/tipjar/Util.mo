@@ -2,6 +2,7 @@ import Array "mo:core/Array";
 import Blob "mo:core/Blob";
 import Debug "mo:core/Debug";
 import Iter "mo:core/Iter";
+import Map "mo:core/Map";
 import Nat "mo:core/Nat";
 import Nat64 "mo:core/Nat64";
 import Nat8 "mo:core/Nat8";
@@ -427,14 +428,87 @@ module Util {
   };
 
   public type ExportData = {
-    users: [Util.UserInfo];
-    canisters: [Util.CanisterInfo]
+    users: [UserInfo];
+    canisters: [CanisterInfo]
   };
 
   // Helper to export canister and user info.
-  public func export(users: Queue<User>, canisters: Queue<Canister>)  : ExportData {
-    { users = Array.map(Queue.toArray(users), userInfo);
-      canisters = Array.map(Queue.toArray(canisters), canisterInfo);
+  public func exportData(users: Queue<User>, canisters: Queue<Canister>) : Result.Result<ExportData, Text> {
+    let canisterMap = Map.empty<Principal, ()>();
+    for (canister in Queue.toIter(canisters)) {
+      Map.add(canisterMap, Principal.compare, canister.id, ());
+    };
+    for (user in Queue.toIter(users)) {
+      for (alloc in Queue.toIter(user.allocations)) {
+        if (Option.isNull(Map.get(canisterMap, Principal.compare, alloc.canister.id))) {
+          return #err("Canister not exported: " # Principal.toText(alloc.canister.id));
+        };
+      };
+    };
+    #ok { users = Array.map(Queue.toArray(users), userInfo);
+          canisters = Array.map(Queue.toArray(canisters), canisterInfo);
     }
+  };
+
+  public type ImportData = {
+    users: Queue<User>;
+    canisters: Queue<Canister>
+  };
+
+  public func importData(users: [UserInfo], canisters: [CanisterInfo]) : Result.Result<ImportData, Text> {
+    let canisterMap = Map.empty<Principal, Canister>();
+    let canisterQueue = Queue.empty<Canister>();
+
+    for (info in canisters.vals()) {
+      let canister : Canister = {
+        id = info.id;
+        first_checked = info.first_checked;
+        var last_checked = info.last_checked;
+        var last_donated = info.last_checked;
+        cycle_balances = Queue.make(info.last_checked_balance);
+        usage = Queue.fromArray(info.usage);
+        donors = Queue.empty();
+        var error = info.error;
+      };
+      Map.add(canisterMap, Principal.compare, info.id, canister);
+      ignore Queue.pushBack(canisterQueue, canister);
+    };
+
+    let userQueue = Queue.empty<User>();
+
+    for (userInfo in users.vals()) {
+      let user : User = {
+        id = userInfo.id;
+        var delegate = userInfo.delegate;
+        balance = { icp = { var e8s = userInfo.balance.icp.e8s }; var cycle = userInfo.balance.cycle };
+        allocations = Queue.empty();
+        var last_updated = userInfo.last_updated;
+        var status = userInfo.status;
+      };
+      ignore Queue.pushBack(userQueue, user);
+
+      for (allocInfo in userInfo.allocations.vals()) {
+        let canister = switch (Map.get(canisterMap, Principal.compare, allocInfo.canister.id)) {
+          case (?c) c;
+          case null { return #err("Canister not found in import: " # Principal.toText(allocInfo.canister.id)) }
+        };
+
+        let allocation : Allocation = {
+          canister = canister;
+          var alias = if (allocInfo.alias == "") { null } else { ?allocInfo.alias };
+          var allocated = allocInfo.allocated;
+          var donated = allocInfo.donated;
+        };
+        ignore Queue.pushBack(user.allocations, allocation);
+
+        let donor : Donor = {
+          id = userInfo.id;
+          allocation = allocation;
+        };
+        ignore Queue.pushBack(canister.donors, donor);
+      }
+    };
+
+    #ok { users = userQueue; canisters = canisterQueue }
   }
 }

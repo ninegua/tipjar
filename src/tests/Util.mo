@@ -6,12 +6,13 @@ import Option "mo:core/Option";
 import Principal "mo:core/Principal";
 import Result "mo:core/Result";
 import Runtime "mo:core/Runtime";
+import Text "mo:core/Text";
 import Queue "mo:mutable-queue/Queue";
 import Util "../tipjar/Util";
 
 // ─── Assertion helpers ───
 
-func fail(msg : Text) {
+func fail(msg : Text) : None {
   Runtime.trap("FAIL: " # msg);
 };
 
@@ -582,7 +583,10 @@ ignore Util.setUserCycle(eUser1, 10_000);
 let eCanisters : Queue.Queue<Util.Canister> = Queue.empty();
 let _eC1 = Util.findOrAddCanister(eCanisters, p2, 5_000);
 
-let exported = Util.export(eUsers, eCanisters);
+let exported = switch (Util.exportData(eUsers, eCanisters)) {
+  case (#ok(d)) d;
+  case (#err(e)) { fail("export should not error: " # e) }
+};
 eqNat(exported.users.size(), 1, "export users count");
 eqNat(exported.canisters.size(), 1, "export canisters count");
 eqNat(Principal.toBlob(exported.users[0].id).size(), Principal.toBlob(p1).size(), "export user id");
@@ -626,6 +630,223 @@ switch (mToAlloc2) {
 };
 eqNat(mFrom.balance.cycle, 0, "transferAccount zeroes from_user balance");
 pass("transferAccount merge allocations");
+
+// ═══════════════════════════════════════════════════════════
+// Test: import empty
+// ═══════════════════════════════════════════════════════════
+Debug.print("--- Test import empty ---");
+
+let emptyImported = switch (Util.importData([], [])) {
+  case (#ok(d)) d;
+  case (#err(e)) { fail("import empty should not error: " # e) }
+};
+eqNat(Queue.size(emptyImported.users), 0, "import empty users");
+eqNat(Queue.size(emptyImported.canisters), 0, "import empty canisters");
+pass("import empty");
+
+// ═══════════════════════════════════════════════════════════
+// Test: import round-trip
+// ═══════════════════════════════════════════════════════════
+Debug.print("--- Test import round-trip ---");
+
+let iUsers : Queue.Queue<Util.User> = Queue.empty();
+let iUser1 = Util.findOrCreateNewUser(iUsers, p1);
+ignore Util.setUserCycle(iUser1, 10_000_000);
+ignore Util.setUserICP(iUser1, { e8s = 500_000_000 : Nat64 });
+ignore Util.delegateUser(iUser1, p2);
+Util.setUserStatus(iUser1, ?#DepositSuccess);
+
+let iCanisters : Queue.Queue<Util.Canister> = Queue.empty();
+let iCan1 = Util.findOrAddCanister(iCanisters, p2, 5_000_000);
+Util.addCanisterCycleCheck(iCan1, 6_000_000);
+iCan1.error := ?"test error";
+
+let _iAlloc : Result.Result<Util.Allocation, Util.Cycle> = Util.setAllocation(iUser1, iCan1, ?"my-canister", 3_000_000);
+
+let iExported = switch (Util.exportData(iUsers, iCanisters)) {
+  case (#ok(d)) d;
+  case (#err(e)) { fail("export round-trip should not error: " # e) }
+};
+let iImported = switch (Util.importData(iExported.users, iExported.canisters)) {
+  case (#ok(d)) d;
+  case (#err(e)) { fail("import round-trip should not error: " # e) }
+};
+
+eqNat(Queue.size(iImported.users), 1, "import users count");
+eqNat(Queue.size(iImported.canisters), 1, "import canisters count");
+
+let iFoundUser = Util.findUser(iImported.users, p1);
+isSome(iFoundUser, "import finds user");
+switch (iFoundUser) {
+  case (?u) {
+    eqBool(u.id == p1, true, "import user id");
+    eqNat(u.balance.cycle, 7_000_000, "import user balance");
+    eqNat64(u.balance.icp.e8s, 500_000_000, "import user icp");
+    eqNat(Queue.size(u.allocations), 1, "import user allocations");
+    switch (u.delegate) {
+      case (?d) { eqBool(d == p2, true, "import user delegate") };
+      case null { fail("import user delegate should be set") };
+    };
+    switch (u.status) {
+      case (?#DepositSuccess) {};
+      case _ { fail("import user status should be DepositSuccess") };
+    };
+  };
+  case null { fail("import user should exist") };
+};
+
+let iFoundCanister = Util.findCanister(iImported.canisters, p2);
+isSome(iFoundCanister, "import finds canister");
+switch (iFoundCanister) {
+  case (?c) {
+    eqBool(c.id == p2, true, "import canister id");
+    eqNat(Util.getCanisterCycle(c), 6_000_000, "import canister cycle");
+    eqNat(Util.getCanisterAllocation(c), 3_000_000, "import canister allocation");
+    eqNat(Util.getCanisterDonated(c), 0, "import canister donated");
+    eqNat(Queue.size(c.donors), 1, "import canister donors");
+    eqNat(Queue.size(c.cycle_balances), 1, "import canister cycle_balances");
+    eqNat(Queue.size(c.usage), 0, "import canister usage");
+    switch (c.error) {
+      case (?e) { eqText(e, "test error", "import canister error") };
+      case null { fail("import canister error should be set") };
+    };
+  };
+  case null { fail("import canister should exist") };
+};
+
+pass("import round-trip");
+
+// ═══════════════════════════════════════════════════════════
+// Test: import reconstructs donors
+// ═══════════════════════════════════════════════════════════
+Debug.print("--- Test import donors ---");
+
+let idUsers : Queue.Queue<Util.User> = Queue.empty();
+let idUser1 = Util.findOrCreateNewUser(idUsers, p1);
+let idUser2 = Util.findOrCreateNewUser(idUsers, p2);
+ignore Util.setUserCycle(idUser1, 10_000_000);
+ignore Util.setUserCycle(idUser2, 10_000_000);
+
+let idCanisters : Queue.Queue<Util.Canister> = Queue.empty();
+let idCan1 = Util.findOrAddCanister(idCanisters, p3, 0);
+
+let _idAlloc1 : Result.Result<Util.Allocation, Util.Cycle> = Util.setAllocation(idUser1, idCan1, ?"alloc1", 4_000_000);
+let _idAlloc2 : Result.Result<Util.Allocation, Util.Cycle> = Util.setAllocation(idUser2, idCan1, ?"alloc2", 6_000_000);
+
+let idExported = switch (Util.exportData(idUsers, idCanisters)) {
+  case (#ok(d)) d;
+  case (#err(e)) { fail("export donors should not error: " # e) }
+};
+let idImported = switch (Util.importData(idExported.users, idExported.canisters)) {
+  case (#ok(d)) d;
+  case (#err(e)) { fail("import donors should not error: " # e) }
+};
+
+let idImportedCanister = Util.findCanister(idImported.canisters, p3);
+isSome(idImportedCanister, "import donors canister exists");
+switch (idImportedCanister) {
+  case (?c) {
+    eqNat(Queue.size(c.donors), 2, "import donors count");
+    eqNat(Util.getCanisterAllocation(c), 10_000_000, "import donors total allocation");
+    eqNat(Util.getCanisterDonated(c), 0, "import donors total donated");
+
+    let idImportedUser1 = Util.findUser(idImported.users, p1);
+    switch (idImportedUser1) {
+      case (?u) {
+        let a1 = Util.findAllocation(u, p3);
+        isSome(a1, "import user1 allocation exists");
+        switch (a1) {
+          case (?a) {
+            eqNat(a.allocated, 4_000_000, "import user1 allocation amount");
+            switch (a.alias) {
+              case (?s) { eqText(s, "alloc1", "import user1 allocation alias") };
+              case null { fail("import user1 alias should be set") };
+            };
+          };
+          case null { fail("import user1 allocation should exist") };
+        };
+      };
+      case null { fail("import user1 should exist") };
+    };
+  };
+  case null { fail("import donors canister should exist") };
+};
+
+pass("import donors");
+
+// ═══════════════════════════════════════════════════════════
+// Test: import usage history
+// ═══════════════════════════════════════════════════════════
+Debug.print("--- Test import usage ---");
+
+let uCanisters : Queue.Queue<Util.Canister> = Queue.empty();
+let uCan1 = Util.findOrAddCanister(uCanisters, p1, 1_000);
+Util.addDonation(uCan1, 100);
+Util.addDonation(uCan1, 200);
+
+let uUsers : Queue.Queue<Util.User> = Queue.empty();
+let uExported = switch (Util.exportData(uUsers, uCanisters)) {
+  case (#ok(d)) d;
+  case (#err(e)) { fail("export usage should not error: " # e) }
+};
+let uImported = switch (Util.importData(uExported.users, uExported.canisters)) {
+  case (#ok(d)) d;
+  case (#err(e)) { fail("import usage should not error: " # e) }
+};
+
+let uImportedCanister = Util.findCanister(uImported.canisters, p1);
+isSome(uImportedCanister, "import usage canister exists");
+switch (uImportedCanister) {
+  case (?c) {
+    eqNat(Queue.size(c.usage), 2, "import usage history size");
+    let usages = Queue.toArray(c.usage);
+    eqNat(usages[0].cycle, 100, "import usage first entry");
+    eqNat(usages[1].cycle, 200, "import usage second entry");
+  };
+  case null { fail("import usage canister should exist") };
+};
+
+pass("import usage");
+
+// ═══════════════════════════════════════════════════════════
+// Test: import error when canister is missing from top-level array
+// ═══════════════════════════════════════════════════════════
+Debug.print("--- Test import missing canister ---");
+
+let fbUser : Util.UserInfo = {
+  id = p1;
+  delegate = null;
+  balance = { icp = { e8s = 0 : Nat64 }; cycle = 0 };
+  allocations = [
+    {
+      canister = {
+        id = p2;
+        first_checked = 0;
+        last_checked = 0;
+        last_checked_balance = 1_000_000;
+        average_balance = 1_000_000;
+        total_allocation = 5_000_000;
+        total_donated = 0;
+        usage = [];
+        error = null;
+      };
+      alias = "missing-canister";
+      allocated = 5_000_000;
+      donated = 0;
+    }
+  ];
+  last_updated = 0;
+  status = null;
+};
+
+switch (Util.importData([fbUser], [])) {
+  case (#ok(_)) { fail("import should error when canister is missing from top-level array") };
+  case (#err(e)) {
+    eqBool(Text.contains(e, #text "Canister not found in import"), true, "import missing canister error message");
+  };
+};
+
+pass("import missing canister");
 
 // ═══════════════════════════════════════════════════════════
 // Summary

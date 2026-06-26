@@ -104,8 +104,8 @@ shared (installation) persistent actor class TipJar() = self {
   // User related operations
   //////////////////////////////////////////////////////////////////////////
 
-  let canisters_v3: Queue<Canister> = Queue.empty();
-  let users_v3: Queue<User> = Queue.empty();
+  var canisters_v3: Queue<Canister> = Queue.empty();
+  var users_v3: Queue<User> = Queue.empty();
 
   // Use this function to get the user list instead of the stable variable itself.
   func all_users() : Queue<User> {
@@ -740,11 +740,25 @@ shared (installation) persistent actor class TipJar() = self {
   };
 
   //////////////////////////////////////////////////////////////////////////
-  // Backup
+  // Backup and Restore
   //////////////////////////////////////////////////////////////////////////
-  public shared (arg) func export() : async Util.ExportData {
+  public shared (arg) func backup() : async Util.ExportData {
     assert(arg.caller == OWNER);
-    Util.export(all_users(), all_canisters())
+    switch (Util.exportData(all_users(), all_canisters())) {
+      case (#err(e)) { Runtime.trap(e) };
+      case (#ok(data)) { data };
+    }
+  };
+
+  public shared (arg) func restore(data: Util.ExportData) : async () {
+    assert(arg.caller == OWNER);
+    switch (Util.importData(data.users, data.canisters)) {
+      case (#err(e)) { Runtime.trap(e) };
+      case (#ok(imported)) { 
+        users_v3 := imported.users;
+        canisters_v3 := imported.canisters;
+      };
+    }
   };
 
   system func postupgrade() {
