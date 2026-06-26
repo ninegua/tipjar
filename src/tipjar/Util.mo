@@ -62,7 +62,7 @@ module Util {
 
   public type UserInfo = {
     id: Principal;
-    account: Text;
+    delegate: ?Principal;
     balance: BalanceInfo;
     allocations: [AllocationInfo];
     last_updated: Time.Time;
@@ -137,13 +137,10 @@ module Util {
       donated = allocation.donated; }
   };
 
-  // Convert User to UserInfo. The 'self' parameter (tipjar's canister id)
-  // is used to calculate account number.
-  public func userInfo(self: Principal, user: User) : UserInfo {
-    let subaccount = principalToSubAccount(user.id);
-    let account = toHex(Principal.toLedgerAccount(self, ?subaccount));
+  // Convert User to UserInfo.
+  public func userInfo(user: User) : UserInfo {
     { id = user.id;
-      account = account;
+      delegate = user.delegate;
       balance = balanceInfo(user.balance);
       allocations = Iter.toArray(Iter.map(Queue.toIter(user.allocations), allocationInfo));
       last_updated = user.last_updated;
@@ -428,4 +425,16 @@ module Util {
       hexChars[a] # hexChars[b]
     }), "")
   };
+
+  public type ExportData = {
+    users: [Util.UserInfo];
+    canisters: [Util.CanisterInfo]
+  };
+
+  // Helper to export canister and user info.
+  public func export(users: Queue<User>, canisters: Queue<Canister>)  : ExportData {
+    { users = Array.map(Queue.toArray(users), userInfo);
+      canisters = Array.map(Queue.toArray(canisters), canisterInfo);
+    }
+  }
 }

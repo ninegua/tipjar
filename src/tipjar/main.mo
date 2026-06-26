@@ -117,9 +117,14 @@ shared (installation) persistent actor class TipJar() = self {
     return canisters_v3;
   };
 
+  public type UserInfo = Util.UserInfo and { account: Text };
+
   // Convert User to UserInfo.
-  func userInfo(user: User) : Util.UserInfo {
-    Util.userInfo(Principal.fromActor(self), user)
+  func userInfo(user: User) : UserInfo {
+    let info = Util.userInfo(user);
+    let subaccount = Util.principalToSubAccount(user.id);
+    let account = Util.toHex(Principal.toLedgerAccount(Principal.fromActor(self), ?subaccount));
+    { info and { account = account; } }
   };
 
   // Find a user by id.
@@ -206,7 +211,7 @@ shared (installation) persistent actor class TipJar() = self {
 
   // Return 'UserInfo' of the caller.
   // Note that it will return a default value even when the caller doesn't have an account.
-  public shared query (arg) func aboutme() : async Util.UserInfo {
+  public shared query (arg) func aboutme() : async UserInfo {
     userInfo(Option.get(findUser(arg.caller), Util.newUser(arg.caller)))
   };
 
@@ -268,7 +273,7 @@ shared (installation) persistent actor class TipJar() = self {
   // Create an allocation by setting aside some cycles that will be donated to a given canister.
   // Return updated UserInfo if successful.
   public shared (arg) func allocate(alloc: AllocationInput)
-      : async Result<Util.UserInfo, AllocationError> {
+      : async Result<UserInfo, AllocationError> {
     let log = logger("allocate");
     switch (alloc.alias) {
       case null ();
@@ -737,14 +742,9 @@ shared (installation) persistent actor class TipJar() = self {
   //////////////////////////////////////////////////////////////////////////
   // Backup
   //////////////////////////////////////////////////////////////////////////
-  public shared (arg) func export_users() : async [Util.UserInfo] {
+  public shared (arg) func export() : async Util.ExportData {
     assert(arg.caller == OWNER);
-    Array.map(Queue.toArray(all_users()), userInfo)
-  };
-
-  public shared (arg) func export_canisters() : async [Util.CanisterInfo] {
-    assert(arg.caller == OWNER);
-    Array.map(Queue.toArray(all_canisters()), Util.canisterInfo)
+    Util.export(all_users(), all_canisters())
   };
 
   system func postupgrade() {

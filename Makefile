@@ -5,6 +5,8 @@ FRONTEND_SRC=$(wildcard src/frontend/*) $(wildcard src/public/*) src/public/faq.
 FRONTEND_DEPS=dist/tipjar.js dist/cycles-ledger.js dist/icp-ledger.js
 IC_VERSION=a17247bd86c7aa4e87742bf74d108614580f216d
 MOC_FLAGS?=$(shell vessel sources) --enhanced-orthogonal-persistence
+TESTS=Util
+TEST_TARGETS=$(TESTS:%=run/%)
 DIDC?=didc
 
 BLACKHOLE_WASM?=dist/blackhole-opt.wasm
@@ -72,6 +74,11 @@ src/public/faq.html: FAQ.md
 	tail -n"$$(($$(wc -l FAQ.md|cut -d\  -f1) - 1))" $< | \
 		pandoc --css=https://cdn.simplecss.org/simple.min.css --toc --toc-depth=6 \
 		--template=template.html -f markdown -t html --shift-heading-level-by=3 > $@
+
+test: $(TEST_TARGETS)
+
+run/%: src/tests/%.mo $(TIPJAR_SRC)
+	moc $(MOC_FLAGS) -r $<
 
 clean:
 	rm -f src/public/faq.html
