@@ -7,6 +7,7 @@ import Principal "mo:core/Principal";
 import Result "mo:core/Result";
 import Runtime "mo:core/Runtime";
 import Text "mo:core/Text";
+import PriorityQueue "mo:core/PriorityQueue";
 import Queue "mo:mutable-queue/Queue";
 import Util "../tipjar/Util";
 
@@ -223,10 +224,10 @@ pass("addCanisterCycleCheck MAX_HISTORY");
 // ═══════════════════════════════════════════════════════════
 Debug.print("--- Test findCanister / findOrAddCanister ---");
 
-let canisters : Queue.Queue<Util.Canister> = Queue.empty();
+let canisters : PriorityQueue.PriorityQueue<Util.Canister> = PriorityQueue.empty();
 let cAdd = Util.findOrAddCanister(canisters, p1, 10_000_000);
 eqNat(Principal.toBlob(cAdd.id).size(), Principal.toBlob(p1).size(), "findOrAddCanister creates canister");
-eqNat(Queue.size(canisters), 1, "findOrAddCanister pushes to queue");
+eqNat(PriorityQueue.size(canisters), 1, "findOrAddCanister pushes to queue");
 
 let cFound = Util.findCanister(canisters, p1);
 isSome(cFound, "findCanister finds existing canister");
@@ -236,8 +237,51 @@ isNull(cNotFound, "findCanister returns null for non-existent");
 
 // findOrAddCanister again should not duplicate
 let _cAdd2 = Util.findOrAddCanister(canisters, p1, 20_000_000);
-eqNat(Queue.size(canisters), 1, "findOrAddCanister does not duplicate");
+eqNat(PriorityQueue.size(canisters), 1, "findOrAddCanister does not duplicate");
 pass("findCanister / findOrAddCanister");
+
+// ═══════════════════════════════════════════════════════════
+// Test: PriorityQueue pops canister with smallest last_checked
+// ═══════════════════════════════════════════════════════════
+Debug.print("--- Test PriorityQueue pop ordering ---");
+
+let pqCanisters : PriorityQueue.PriorityQueue<Util.Canister> = PriorityQueue.empty();
+
+// Create canisters with different last_checked values.
+// compareCanister uses Int.compare(y.last_checked, x.last_checked) so the
+// smallest last_checked should be popped first.
+let pqC1 : Util.Canister = { id = p1; first_checked = 0; var last_checked = 1000; var last_donated = 0; cycle_balances = Queue.empty(); usage = Queue.empty(); donors = Queue.empty(); var error = null };
+let pqC2 : Util.Canister = { id = p2; first_checked = 0; var last_checked = 500;  var last_donated = 0; cycle_balances = Queue.empty(); usage = Queue.empty(); donors = Queue.empty(); var error = null };
+let pqC3 : Util.Canister = { id = p3; first_checked = 0; var last_checked = 1500; var last_donated = 0; cycle_balances = Queue.empty(); usage = Queue.empty(); donors = Queue.empty(); var error = null };
+
+// Push in arbitrary order (not sorted by last_checked)
+PriorityQueue.push(pqCanisters, Util.compareCanister, pqC3);
+PriorityQueue.push(pqCanisters, Util.compareCanister, pqC1);
+PriorityQueue.push(pqCanisters, Util.compareCanister, pqC2);
+eqNat(PriorityQueue.size(pqCanisters), 3, "PriorityQueue has 3 canisters");
+
+// Pop 1: should be pqC2 (last_checked = 500, smallest)
+let pqPop1 = PriorityQueue.pop(pqCanisters, Util.compareCanister);
+isSome(pqPop1, "pop returns some");
+eqBool(switch (pqPop1) { case (?c) { c.id == p2 }; case null { false } }, true, "first pop is p2 (smallest last_checked=500)");
+eqNat(PriorityQueue.size(pqCanisters), 2, "PriorityQueue has 2 after pop");
+
+// Pop 2: should be pqC1 (last_checked = 1000)
+let pqPop2 = PriorityQueue.pop(pqCanisters, Util.compareCanister);
+isSome(pqPop2, "pop returns some second time");
+eqBool(switch (pqPop2) { case (?c) { c.id == p1 }; case null { false } }, true, "second pop is p1 (last_checked=1000)");
+eqNat(PriorityQueue.size(pqCanisters), 1, "PriorityQueue has 1 after pop");
+
+// Pop 3: should be pqC3 (last_checked = 1500, largest)
+let pqPop3 = PriorityQueue.pop(pqCanisters, Util.compareCanister);
+isSome(pqPop3, "pop returns some third time");
+eqBool(switch (pqPop3) { case (?c) { c.id == p3 }; case null { false } }, true, "third pop is p3 (largest last_checked=1500)");
+eqNat(PriorityQueue.size(pqCanisters), 0, "PriorityQueue empty after all pops");
+
+// Pop on empty returns null
+let pqPop4 = PriorityQueue.pop(pqCanisters, Util.compareCanister);
+isNull(pqPop4, "pop on empty returns null");
+pass("PriorityQueue pop ordering");
 
 // ═══════════════════════════════════════════════════════════
 // Test: setAllocation - new allocation
@@ -580,7 +624,7 @@ let eUsers : Queue.Queue<Util.User> = Queue.empty();
 let eUser1 = Util.findOrCreateNewUser(eUsers, p1);
 ignore Util.setUserCycle(eUser1, 10_000);
 
-let eCanisters : Queue.Queue<Util.Canister> = Queue.empty();
+let eCanisters : PriorityQueue.PriorityQueue<Util.Canister> = PriorityQueue.empty();
 let _eC1 = Util.findOrAddCanister(eCanisters, p2, 5_000);
 
 let exported = switch (Util.exportData(eUsers, eCanisters)) {
@@ -641,7 +685,7 @@ let emptyImported = switch (Util.importData([], [])) {
   case (#err(e)) { fail("import empty should not error: " # e) }
 };
 eqNat(Queue.size(emptyImported.users), 0, "import empty users");
-eqNat(Queue.size(emptyImported.canisters), 0, "import empty canisters");
+eqNat(PriorityQueue.size(emptyImported.canisters), 0, "import empty canisters");
 pass("import empty");
 
 // ═══════════════════════════════════════════════════════════
@@ -656,7 +700,7 @@ ignore Util.setUserICP(iUser1, { e8s = 500_000_000 : Nat64 });
 ignore Util.delegateUser(iUser1, p2);
 Util.setUserStatus(iUser1, ?#DepositSuccess);
 
-let iCanisters : Queue.Queue<Util.Canister> = Queue.empty();
+let iCanisters : PriorityQueue.PriorityQueue<Util.Canister> = PriorityQueue.empty();
 let iCan1 = Util.findOrAddCanister(iCanisters, p2, 5_000_000);
 Util.addCanisterCycleCheck(iCan1, 6_000_000);
 iCan1.error := ?"test error";
@@ -673,7 +717,7 @@ let iImported = switch (Util.importData(iExported.users, iExported.canisters)) {
 };
 
 eqNat(Queue.size(iImported.users), 1, "import users count");
-eqNat(Queue.size(iImported.canisters), 1, "import canisters count");
+eqNat(PriorityQueue.size(iImported.canisters), 1, "import canisters count");
 
 let iFoundUser = Util.findUser(iImported.users, p1);
 isSome(iFoundUser, "import finds user");
@@ -727,7 +771,7 @@ let idUser2 = Util.findOrCreateNewUser(idUsers, p2);
 ignore Util.setUserCycle(idUser1, 10_000_000);
 ignore Util.setUserCycle(idUser2, 10_000_000);
 
-let idCanisters : Queue.Queue<Util.Canister> = Queue.empty();
+let idCanisters : PriorityQueue.PriorityQueue<Util.Canister> = PriorityQueue.empty();
 let idCan1 = Util.findOrAddCanister(idCanisters, p3, 0);
 
 let _idAlloc1 : Result.Result<Util.Allocation, Util.Cycle> = Util.setAllocation(idUser1, idCan1, ?"alloc1", 4_000_000);
@@ -779,7 +823,7 @@ pass("import donors");
 // ═══════════════════════════════════════════════════════════
 Debug.print("--- Test import usage ---");
 
-let uCanisters : Queue.Queue<Util.Canister> = Queue.empty();
+let uCanisters : PriorityQueue.PriorityQueue<Util.Canister> = PriorityQueue.empty();
 let uCan1 = Util.findOrAddCanister(uCanisters, p1, 1_000);
 Util.addDonation(uCan1, 100);
 Util.addDonation(uCan1, 200);
