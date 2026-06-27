@@ -1,13 +1,16 @@
 import Array "mo:core/Array";
 import Blob "mo:core/Blob";
 import Debug "mo:core/Debug";
+import Int "mo:core/Int";
 import Iter "mo:core/Iter";
 import Map "mo:core/Map";
 import Nat "mo:core/Nat";
 import Nat64 "mo:core/Nat64";
 import Nat8 "mo:core/Nat8";
 import Option "mo:core/Option";
+import Order "mo:core/Order";
 import Principal "mo:core/Principal";
+import PriorityQueue "mo:core/PriorityQueue";
 import Result "mo:core/Result";
 import Runtime "mo:core/Runtime";
 import Text "mo:core/Text";
@@ -21,6 +24,7 @@ module Util {
   // At an interval of 8 hours, 30 means keeping data for the past 10 days.
   let MAX_HISTORY = 30;
 
+  public type PriorityQueue<T> = PriorityQueue.PriorityQueue<T>;
   public type Queue<T> = Queue.Queue<T>;
   public type Cycle = Nat;
 
@@ -385,12 +389,12 @@ module Util {
   };
 
   // Lookup a canister by id.
-  public func findCanister(canisters: Queue<Canister>, id: Principal) : ?Canister {
-    Queue.find(canisters, eqId(id))
+  public func findCanister(canisters: PriorityQueue<Canister>, id: Principal) : ?Canister {
+    Iter.find(PriorityQueue.values(canisters, compareCanister), eqId(id))
   };
 
   // Same as 'findCanister' but will create a new canister if it didn't exist.
-  public func findOrAddCanister(canisters: Queue<Canister>, id: Principal, cycle: Cycle)
+  public func findOrAddCanister(canisters: PriorityQueue<Canister>, id: Principal, cycle: Cycle)
       : Canister {
     switch (findCanister(canisters, id)) {
       case (?canister) canister;
@@ -406,7 +410,7 @@ module Util {
               donors = Queue.empty();
               var error = null;
             };
-        ignore Queue.pushFront(canister, canisters);
+        PriorityQueue.push(canisters, compareCanister, canister);
         canister
       }
     }
@@ -433,9 +437,9 @@ module Util {
   };
 
   // Helper to export canister and user info.
-  public func exportData(users: Queue<User>, canisters: Queue<Canister>) : Result.Result<ExportData, Text> {
+  public func exportData(users: Queue<User>, canisters: PriorityQueue<Canister>) : Result.Result<ExportData, Text> {
     let canisterMap = Map.empty<Principal, ()>();
-    for (canister in Queue.toIter(canisters)) {
+    for (canister in PriorityQueue.values(canisters, compareCanister)) {
       Map.add(canisterMap, Principal.compare, canister.id, ());
     };
     for (user in Queue.toIter(users)) {
@@ -446,18 +450,25 @@ module Util {
       };
     };
     #ok { users = Array.map(Queue.toArray(users), userInfo);
-          canisters = Array.map(Queue.toArray(canisters), canisterInfo);
+          canisters = Array.fromIter(Iter.map(PriorityQueue.values(canisters, compareCanister), canisterInfo));
     }
   };
 
   public type ImportData = {
     users: Queue<User>;
-    canisters: Queue<Canister>
+    canisters: PriorityQueue<Canister>;
+  };
+
+  // We use PriorityQueue to store canisters, and the one with smallest last_checked
+  // value should be on top of the queue.  So the compare function for canisters
+  // is the inverse of comparing last_checked.
+  public func compareCanister(x: Canister, y: Canister) : Order.Order {
+    Int.compare(y.last_checked, x.last_checked) 
   };
 
   public func importData(users: [UserInfo], canisters: [CanisterInfo]) : Result.Result<ImportData, Text> {
     let canisterMap = Map.empty<Principal, Canister>();
-    let canisterQueue = Queue.empty<Canister>();
+    let canisterQueue = PriorityQueue.empty<Canister>();
 
     for (info in canisters.vals()) {
       let canister : Canister = {
@@ -471,7 +482,7 @@ module Util {
         var error = info.error;
       };
       Map.add(canisterMap, Principal.compare, info.id, canister);
-      ignore Queue.pushBack(canisterQueue, canister);
+      PriorityQueue.push(canisterQueue, compareCanister, canister);
     };
 
     let userQueue = Queue.empty<User>();

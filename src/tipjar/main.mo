@@ -2,11 +2,13 @@ import Array "mo:core/Array";
 import Cycles "mo:core/Cycles";
 import Error "mo:core/Error";
 import Int "mo:core/Int";
+import Iter "mo:core/Iter";
 import Nat "mo:core/Nat";
 import Nat64 "mo:core/Nat64";
 import Option "mo:core/Option";
 import Order "mo:core/Order";
 import Principal "mo:core/Principal";
+import PriorityQueue "mo:core/PriorityQueue";
 import Result "mo:core/Result";
 import Time "mo:core/Time";
 import { Tuple2 } "mo:core/Tuples";
@@ -53,8 +55,8 @@ shared (installation) persistent actor class TipJar() = self {
   // Wait for CHECK_INTERVAL before checking a canister's cycle balance again (8 hours).
   transient let CHECK_INTERVAL = 3600 * 8_000_000_000;
 
-  // Period to call the poll function when there are pending deposits (every 5 seconds).
-  transient let POLLING_PERIOD = 5 * 1_000_000_000;
+  // Period to call the poll function when there are pending deposits (every 5 minutes).
+  transient let POLLING_PERIOD = 5 * 60 * 1_000_000_000;
 
   // The minimum gap (from the average) required before we topup a canister.
   transient let MIN_CYCLE_GAP = 100_000_000_000;
@@ -74,6 +76,7 @@ shared (installation) persistent actor class TipJar() = self {
   type Canister = Util.Canister;
   type ICP = Util.ICP;
   type Cycle = Util.Cycle;
+  type PriorityQueue<T> = PriorityQueue.PriorityQueue<T>;
   type Queue<T> = Queue.Queue<T>;
   type Result<O, E> = Result.Result<O, E>;
 
@@ -105,6 +108,7 @@ shared (installation) persistent actor class TipJar() = self {
   //////////////////////////////////////////////////////////////////////////
 
   var canisters_v3: Queue<Canister> = Queue.empty();
+  var canisters_v4: PriorityQueue<Canister> = PriorityQueue.empty();
   var users_v3: Queue<User> = Queue.empty();
 
   // Use this function to get the user list instead of the stable variable itself.
@@ -113,8 +117,8 @@ shared (installation) persistent actor class TipJar() = self {
   };
 
   // Use this function to get the canister list instead of the stable variable itself.
-  func all_canisters() : Queue<Canister> {
-    return canisters_v3;
+  func all_canisters() : PriorityQueue<Canister> {
+    return canisters_v4;
   };
 
   public type UserInfo = Util.UserInfo and { account: Text };
@@ -242,7 +246,7 @@ shared (installation) persistent actor class TipJar() = self {
           let _ = Set.insert(set, compare, elem);
        }
     };
-    for (canister in Queue.toIter(all_canisters())) {
+    for (canister in PriorityQueue.values(all_canisters(), Util.compareCanister)) {
        out := out # "Canister " # Principal.toText(canister.id) # "\n";
        for (donor in Queue.toIter(canister.donors)) {
           let elem = (donor.id, canister.id);
@@ -636,12 +640,14 @@ shared (installation) persistent actor class TipJar() = self {
 
     // Check next canister to see if it needs to be topped up. Note that
     // all canisters are always arranged in the order of last_checked.
-    switch (Queue.first(all_canisters())) {
+    switch (PriorityQueue.pop(all_canisters(), Util.compareCanister)) {
       case null ();
       case (?canister) {
-        if (canister.last_checked + CHECK_INTERVAL <= Time.now()) {
+        if (canister.last_checked + CHECK_INTERVAL > Time.now()) {
+          PriorityQueue.push(all_canisters(), Util.compareCanister, canister);
+        } else {
           canister.last_checked := Time.now();
-          ignore Queue.rotate(all_canisters());
+          PriorityQueue.push(all_canisters(), Util.compareCanister, canister);
           ignore log("BeforeCheck " # debug_show({ canister = canister.id }));
           // Get canister's current cycle balance.
           // Note that the tipjar canister itself requires special handling.
@@ -718,11 +724,12 @@ shared (installation) persistent actor class TipJar() = self {
               pending_deposit = Queue.size(deposits_v2);
               pending_topup = Queue.size(topup_queue);
               balance = selfBalance();
-              canisters = Array.map(Queue.toArray(all_canisters()),
-                            func (x:Canister):Principal {x.id});
+              canisters = Array.fromIter(Iter.map(
+                            PriorityQueue.values(all_canisters(), Util.compareCanister),
+                            func (x:Canister):Principal {x.id}));
             })} else "";
     { donors = Queue.size(all_users());
-      canisters = Queue.size(all_canisters());
+      canisters = PriorityQueue.size(all_canisters());
       funded = tipjar.funded;
       allocated = tipjar.allocated;
       donated = tipjar.donated;
@@ -747,7 +754,7 @@ shared (installation) persistent actor class TipJar() = self {
       case (#err(e)) { Runtime.trap(e) };
       case (#ok(imported)) { 
         users_v3 := imported.users;
-        canisters_v3 := imported.canisters;
+        canisters_v4 := imported.canisters;
       };
     }
   };
@@ -757,5 +764,9 @@ shared (installation) persistent actor class TipJar() = self {
       ignore Queue.pushBack(deposits_v2, { user = x.user; token = #ICP(x.icp) })
     };
     deposits := Queue.empty();
+    for (x in Queue.toIter(canisters_v3)) {
+      PriorityQueue.push(canisters_v4, Util.compareCanister, x);
+    };
+    canisters_v3 := Queue.empty();
   }
 }
