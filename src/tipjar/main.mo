@@ -528,9 +528,7 @@ shared (installation) persistent actor class TipJar() = self {
       };
       case (?(deposit, #Notify(block_height))) {
         let user = deposit.user;
-        let starting_cycles = Cycles.balance();
-        ignore log("BeforeNotify " #
-          debug_show({ user = user.id; deposit = deposit.token; starting_cycles = starting_cycles; }));
+        ignore log("BeforeNotify " # debug_show({ user = user.id; deposit = deposit.token; }));
         try {
           depositing := ?(deposit, #NotifyCalled);
           let result = await CMC.notify_top_up({
@@ -543,21 +541,14 @@ shared (installation) persistent actor class TipJar() = self {
                 debug_show({ block_index = block_height; err = err; }));
               Util.setUserStatus(user, ?#DepositError(debug_show(err)));
             };
-            case (#Ok(result)) {
-              let ending_cycles = Cycles.balance();
-              ignore log("AfterNotify " # debug_show({ ending_cycles = ending_cycles; }));
-              if (ending_cycles < starting_cycles) {
-                // TODO: notify user
-              } else {
-                tipjar.funded := tipjar.funded + ending_cycles - starting_cycles;
-                let beneficiary = Option.get(Option.chain(user.delegate, findUser), user);
-                let old_cycle = beneficiary.balance.cycle;
-                ignore Util.setUserCycle(beneficiary,
-                  beneficiary.balance.cycle + ending_cycles - starting_cycles);
-                ignore log("TopUpCycle " # debug_show({
-                  user = beneficiary.id; delegate = beneficiary.id != user.id;
-                  old = old_cycle; new = beneficiary.balance.cycle; }));
-              };
+            case (#Ok(cycles)) {
+              tipjar.funded := tipjar.funded + cycles;
+              let beneficiary = Option.get(Option.chain(user.delegate, findUser), user);
+              let old_cycle = beneficiary.balance.cycle;
+              ignore Util.setUserCycle(beneficiary, beneficiary.balance.cycle + cycles);
+              ignore log("TopUpCycle " # debug_show({
+                user = beneficiary.id; delegate = beneficiary.id != user.id;
+                old = old_cycle; new = beneficiary.balance.cycle; }));
               Util.setUserStatus(user, ?#DepositSuccess);
             }
           }
