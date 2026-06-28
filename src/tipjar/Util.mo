@@ -15,6 +15,7 @@ import Result "mo:core/Result";
 import Runtime "mo:core/Runtime";
 import Text "mo:core/Text";
 import Time "mo:core/Time";
+import Timer "mo:core/Timer";
 
 import Queue "mo:mutable-queue/Queue";
 
@@ -521,5 +522,35 @@ module Util {
     };
 
     #ok { users = userQueue; canisters = canisterQueue }
-  }
+  };
+
+  public type Task = {
+    name: Text;
+    var running: Bool;
+    var timer_id: ?Timer.TimerId;
+    next_invocation: () -> ?Time.Duration;
+    run: () -> async ();
+  };
+
+  public func schedule_next<system>(task: Task) {
+    switch (task.next_invocation()) {
+      case null {
+        // Nothing to schedule
+        return
+      };
+      case (?dur) {
+        // Avoid scheduling more than one future invocation.
+        // The cancelTimer call is a no-op if the timer_id was already run.
+        Option.forEach(task.timer_id, Timer.cancelTimer);
+        Debug.print("schedule_next(" # task.name # ") in " # debug_show(dur));
+        task.timer_id := ?Timer.setTimer<system>(dur, func() : async () {
+          if (task.running) { return };
+          task.running := true;
+          try { await task.run(); } catch (_) {};
+          task.running := false;
+          schedule_next<system>(task);
+        });
+      }
+    }
+  };
 }

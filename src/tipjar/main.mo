@@ -55,8 +55,11 @@ shared (installation) persistent actor class TipJar() = self {
   // Wait for CHECK_INTERVAL before checking a canister's cycle balance again (8 hours).
   transient let CHECK_INTERVAL = 3600 * 8_000_000_000;
 
-  // Period to call the poll function when there are pending deposits (every 5 minutes).
-  transient let POLLING_PERIOD = 5 * 60 * 1_000_000_000;
+  // Period to poll the next task when there is a pending deposit (2 seconds).
+  transient let DEPOSIT_POLLING_PERIOD = 2 * 1_000_000_000;
+
+  // Period to poll the next task when there is a pending topup (5 seconds).
+  transient let TOPUP_POLLING_PERIOD = 5 * 1_000_000_000;
 
   // The minimum gap (from the average) required before we topup a canister.
   transient let MIN_CYCLE_GAP = 100_000_000_000;
@@ -320,6 +323,7 @@ shared (installation) persistent actor class TipJar() = self {
                   (await Blackhole.canister_status({ canister_id = alloc.canister })).cycles;
                 };
               let canister = Util.findOrAddCanister(all_canisters(), alloc.canister, cycle);
+              Util.schedule_next<system>(check_task);
               let before = Util.getCanisterAllocation(canister);
               switch (Util.setAllocation(user, canister, alloc.alias, alloc.allocated)) {
                 case (#err(usable)) {
@@ -350,6 +354,12 @@ shared (installation) persistent actor class TipJar() = self {
   // We we are in stopping mode, new deposits or topup will not be processed.
   transient var stopping = false;
 
+  // Stop future system activities after finishing pending ones.
+  public shared (arg) func stop(val: Bool) : () {
+    assert(arg.caller == OWNER);
+    stopping := val;
+  };
+
   type DepositToken = { #ICP: ICP; #TCYCLES: Cycle };
 
   type Deposit = { user: User; icp: ICP; };
@@ -370,12 +380,6 @@ shared (installation) persistent actor class TipJar() = self {
 
   // Current deposit in progress.
   transient var depositing : ?Depositing = null;
-
-  // Stop future system activities after finishing pending ones.
-  public shared (arg) func stop(val: Bool) : () {
-    assert(arg.caller == OWNER);
-    stopping := val;
-  };
 
   // A user has to 'ping' to see updated account balance.
   // If some ICP is received, it will be inserted into the deposit queue.
@@ -409,7 +413,7 @@ shared (installation) persistent actor class TipJar() = self {
           }));
         Util.setUserStatus(user, ?#DepositingCycle);
         ignore Queue.pushBack(deposits_v2, { user = user; token = #TCYCLES(cycles) });
-        // TODO: trigger poll
+        Util.schedule_next<system>(deposit_task);
         return;
       }
     } catch (err) {
@@ -429,7 +433,7 @@ shared (installation) persistent actor class TipJar() = self {
         ignore Util.setUserICP(user, icp);
         Util.setUserStatus(user, ?#DepositingCycle);
         ignore Queue.pushBack(deposits_v2, { user = user; token = #ICP(icp) });
-        // TODO: trigger poll
+        Util.schedule_next<system>(deposit_task);
         return;
       };
       switch (findUser(id)) {
@@ -454,14 +458,14 @@ shared (installation) persistent actor class TipJar() = self {
   // Note that this is called from heartbeat, but can also be called manually by admin.
   public shared (arg) func poll() : async () {
     assert(arg.caller == Principal.fromActor(self) or arg.caller == OWNER);
+    await run_deposit()
+  };
 
-    // Only start working on the next deposit if we are not stopping.
-    if (Option.isNull(depositing) and not stopping) {
+  func run_deposit() : async () {
+    if (Option.isNull(depositing)) {
       switch (Queue.popFront(deposits_v2)) {
         case null return;
         case (?deposit) {
-          // We must TRAP if there is a topup in progress to avoid changing deposit queue.
-          assert(Option.isNull(topping_up));
           depositing := ?(deposit, #Mint)
         };
       }
@@ -577,9 +581,11 @@ shared (installation) persistent actor class TipJar() = self {
   // Note that this is called from heartbeat, but can also be called manually by admin.
   public shared (arg) func topup() : async () {
     // Do nothing if we are already doing a topup, or caller is not self or admin.
-    if (Option.isSome(topping_up) or
-        not (arg.caller == Principal.fromActor(self) or arg.caller == OWNER)) return;
+    if (not (arg.caller == Principal.fromActor(self) or arg.caller == OWNER)) return;
+    await run_topup()
+  };
 
+  func run_topup() : async () {
     switch (Queue.popFront(topup_queue)) {
       case null { return };
       case (?canister) {
@@ -610,7 +616,6 @@ shared (installation) persistent actor class TipJar() = self {
           tipjar.allocated := tipjar.allocated - donation;
           // only need to make deposit call when not topping up self
           if (canister.id != Principal.fromActor(self)) {
-            assert(Option.isNull(depositing)); // TRAP when depositing is in progress
             topping_up := ?canister;
             ignore log("BeforeDeposit " #
               debug_show({ canister = canister.id; cycle = donation }));
@@ -631,72 +636,100 @@ shared (installation) persistent actor class TipJar() = self {
     }
   };
 
-  // Check and record next canister's cycle balance if enough time has elapsed
-  // since last check. It is only meant to be called from self or owner.
+  // Check and record next canister's cycle balance and return the timestamp
+  // to make the next "check" call.
+  // It is only meant to be called from self or owner.
   // Note that this function must not TRAP.
   public shared (arg) func check() : async () {
     assert(arg.caller == Principal.fromActor(self) or arg.caller == OWNER);
-    let log = logger("check");
-
-    // Check next canister to see if it needs to be topped up. Note that
-    // all canisters are always arranged in the order of last_checked.
-    switch (PriorityQueue.pop(all_canisters(), Util.compareCanister)) {
-      case null ();
-      case (?canister) {
-        if (canister.last_checked + CHECK_INTERVAL > Time.now()) {
-          PriorityQueue.push(all_canisters(), Util.compareCanister, canister);
-        } else {
-          canister.last_checked := Time.now();
-          PriorityQueue.push(all_canisters(), Util.compareCanister, canister);
-          ignore log("BeforeCheck " # debug_show({ canister = canister.id }));
-          // Get canister's current cycle balance.
-          // Note that the tipjar canister itself requires special handling.
-          let cycle = if (canister.id == Principal.fromActor(self)) {
-             selfBalance()
-          } else {
-            try {
-              let status = await Blackhole.canister_status({ canister_id = canister.id });
-              canister.error := null;
-              status.cycles
-            } catch(err) {
-              canister.error := ?debug_show(Error.code(err));
-              ignore log("AfterCheck " # show_error(err));
-              return;
-            }
-          };
-          Util.addCanisterCycleCheck(canister, cycle);
-          ignore log("AfterCheck " # debug_show({ cycle = cycle }));
-          if (cycle + MIN_CYCLE_GAP <= Util.roundUp(Util.getCanisterAverageCycle(canister))) {
-            ignore log("EnqueueTopUp " # debug_show({ canister = canister.id }));
-            ignore Queue.pushBack(topup_queue, canister);
-          }
-        }
-      }
-    }
+    await run_check();
   };
 
-  // To prevent re-entry of timer function
-  transient var timer_in_progress = false;
+  func run_check<system>() : async () {
+    let log = logger("check");
+    // Check next canister to see if it needs to be topped up. Note that
+    // all canisters are always arranged in the order of last_checked.
+    let canister = switch (PriorityQueue.pop(all_canisters(), Util.compareCanister)) {
+      case null { return };
+      case (?canister) (canister);
+    };
 
-  system func timer(setGlobalTimer : Nat64 -> ()) : async () {
-    // Do nothing if we are stopping.
-    if (stopping or timer_in_progress) return;
-    timer_in_progress := true;
+    canister.last_checked := Time.now();
+    PriorityQueue.push(all_canisters(), Util.compareCanister, canister);
 
-    // let log = logger("timer");
+    ignore log("BeforeCheck " # debug_show({ canister = canister.id }));
+    // Get canister's current cycle balance.
+    // Note that the tipjar canister itself requires special handling.
+    let cycle = if (canister.id == Principal.fromActor(self)) {
+       selfBalance()
+    } else {
+      try {
+        let status = await Blackhole.canister_status({ canister_id = canister.id });
+        canister.error := null;
+        status.cycles
+      } catch(err) {
+        canister.error := ?debug_show(Error.code(err));
+        ignore log("AfterCheck " # show_error(err));
+        return;
+      }
+    };
+    Util.addCanisterCycleCheck(canister, cycle);
+    ignore log("AfterCheck " # debug_show({ cycle = cycle }));
+    if (cycle + MIN_CYCLE_GAP <= Util.roundUp(Util.getCanisterAverageCycle(canister))) {
+      ignore log("EnqueueTopUp " # debug_show({ canister = canister.id }));
+      ignore Queue.pushBack(topup_queue, canister);
+      Util.schedule_next<system>(topup_task);
+    };
+  };
 
-    // Check next canister's cycle balance
-    try { await check() } catch(_) {};
+  transient let deposit_task : Util.Task = {
+    name = "deposit";
+    var running = false;
+    var timer_id = null;
+    run = run_deposit;
+    next_invocation = func () : ?Time.Duration {
+      // Must finish on-going deposit before stopping
+      switch (Queue.first(deposits_v2), depositing, stopping) {
+        case (null, null, _) null;
+        case (_, ?_, _) ?(#nanoseconds DEPOSIT_POLLING_PERIOD);
+        case (_, _, false) ?(#nanoseconds DEPOSIT_POLLING_PERIOD);
+        case (_, _, true) null;
+      };
+    };
+  };
 
-    // Always try to poll to finish the current depositing process.
-    try { await poll() } catch(_) {};
+  transient let topup_task : Util.Task = {
+    name = "topup";
+    var running = false;
+    var timer_id = null;
+    run = run_topup;
+    next_invocation = func () : ?Time.Duration {
+      switch (Queue.first(topup_queue), topping_up, stopping) {
+        case (null, null, _) null;
+        case (_, _, true) null;
+        case (_, _, _) ?(#nanoseconds TOPUP_POLLING_PERIOD);
+      };
+    };
+  };
 
-    // Always try to topup to finish queued topup jobs.
-    try { await topup() } catch(_) {};
-
-    timer_in_progress := false;
-    let now = Time.now();
-    setGlobalTimer(Nat64.fromIntWrap(now + POLLING_PERIOD));
+  transient let check_task : Util.Task = {
+    name = "check";
+    var running = false;
+    var timer_id = null;
+    run = run_check;
+    next_invocation = func () : ?Time.Duration {
+      if (stopping) { return null };
+      Option.map(PriorityQueue.peek(all_canisters()),
+        func(canister) : Time.Duration {
+          let now = Time.now();
+          let next_check = canister.last_checked + CHECK_INTERVAL;
+          if (next_check > now) {
+            #nanoseconds (Int.abs(next_check - now))
+          } else {
+            #nanoseconds 0
+          }
+        })
+    }
   };
 
   //////////////////////////////////////////////////////////////////////////
@@ -718,7 +751,6 @@ shared (installation) persistent actor class TipJar() = self {
             debug_show({
               owner = OWNER;
               stopping = stopping;
-              timer_in_progress = timer_in_progress;
               depositing = depositingInfo();
               topping_up = Option.map(topping_up, func(c: Canister) : Principal { c.id });
               pending_deposit = Queue.size(deposits_v2);
@@ -768,5 +800,8 @@ shared (installation) persistent actor class TipJar() = self {
       PriorityQueue.push(canisters_v4, Util.compareCanister, x);
     };
     canisters_v3 := Queue.empty();
+    Util.schedule_next<system>(deposit_task);
+    Util.schedule_next<system>(topup_task);
+    Util.schedule_next<system>(check_task);
   }
 }
